@@ -77,14 +77,14 @@ LUNCH_FROM = "11:20"        # 午饭锚点
 LUNCH_AFTER = "11:40"       # 景点结束后过了这个点 → 出来立刻吃
 LUNCH_MAX_WAIT = 75         # 为了在饭点前吃饭最多愿意等多久；超过就改成玩完再吃
 DINNER_FROM = "18:00"       # 晚餐锚点：回到住宿片区之后才吃，不在返程路上吃
+EARLIEST_DINNER = "17:00"   # 允许开饭的最早时刻；再早就不能算「晚饭」了
 DINNER_TO_HOTEL = 10        # 饭后走回酒店的分钟数
+MIN_STAY_MINUTES = 20       # 为按时返回，单个景点最少保留的停留时间
 STANDALONE_MINUTES = 240    # 游览 ≥4h → 独占一天
 STANDALONE_TRAVEL_MIN = 45  # 单程 ≥45min → 独占一天
 CAPACITY_SLACK = 1.10       # 容量裁剪的松弛系数（路程有共享，但不能按 0 计）
 OVERRUN_TOLERANCE = 30      # 超过目标返回时间多少分钟算「远郊日跑长了」
 OVERNIGHT_KM = 45.0         # 当天景点离常住片区超过这个距离 → 建议就近过夜
-# 倾向系数：宽松少塞、紧凑多塞（用于容量裁剪的松弛）
-PACE_FACTOR = {"relaxed": 0.82, "balanced": 1.0, "packed": 1.15}
 
 # ================================================================ 分天模型 v2
 # 分天的第一原则是「地理距离」，其次是景点重要性。为此先把景点量化成两件事：
@@ -223,15 +223,33 @@ def day_window(req: Any, day_index: int, total_days: int) -> tuple[str, str]:
     return start, end
 
 
+def meal_minutes(end_hhmm: str) -> int:
+    """当天要预留的用餐分钟数。
+
+    只有「吃完晚饭还来得及按时返回」才算上晚餐 —— 最后一天 16:00 赶返程这种，
+    只预留午餐，`materialize_day` 也不会给它排晚餐。
+    早先无论返程多早都扣两餐 135 分钟，既低估了最后一天的可用时间，
+    又会在时间轴末尾硬塞一顿 18:00 的晚餐，把结束时间拖到 19:25。
+    """
+    latest_dinner = parse_hhmm(end_hhmm) - (MEAL_DINNER_MINUTES + DINNER_TO_HOTEL)
+    if latest_dinner >= parse_hhmm(EARLIEST_DINNER):
+        return MEAL_LUNCH_MINUTES + MEAL_DINNER_MINUTES
+    return MEAL_LUNCH_MINUTES
+
+
 def day_budget(req: Any, day_index: int = 1, total_days: int = 1) -> int:
-    """某天可用于「游览 + 赶路」的分钟数（已扣两餐、已乘倾向系数）。"""
+    """某天可用于「游览 + 赶路」的分钟数（已扣当天实际要吃的餐）。
+
+    **不乘倾向系数** —— 出发 / 返回时间是用户定的硬约束，物理时间不会被「紧凑」
+    抻长 15%。早先乘了 `PACE_FACTOR`，等于凭空多给 54 分钟（420 分钟的时间窗
+    算成 480），最后一天 16:00 赶返程就会溢出。
+    倾向的差异体现在「每天目标游玩时长」（`PACE_TARGET_MINUTES`）和弹性填充上。
+    """
     start_s, end_s = day_window(req, day_index, total_days)
     start, end = parse_hhmm(start_s), parse_hhmm(end_s)
     if end <= start:
         end += 24 * 60
-    raw = (end - start) - (MEAL_LUNCH_MINUTES + MEAL_DINNER_MINUTES)
-    factor = PACE_FACTOR.get(getattr(req, "pace", "balanced"), 1.0)
-    return max(180, int(raw * factor))
+    return max(180, (end - start) - meal_minutes(end_s))
 
 
 def parse_hhmm(value: str) -> int:
@@ -1060,7 +1078,7 @@ def materialize_day(
     base_total = sum(a.visit_minutes for a in items)
     travel_est = _estimate_travel(city, items, origin_lat, origin_lng, req.transport)
     window = return_min - start_min
-    available = window - (MEAL_LUNCH_MINUTES + MEAL_DINNER_MINUTES) - travel_est
+    available = window - meal_minutes(end_s) - travel_est
     scale = _flex_scale(city, items, req, base_total, available)
 
     def stretch(item: Any) -> int:
@@ -1124,48 +1142,94 @@ def materialize_day(
     if not lunch_done and items:
         add_meal("lunch", max(cur_time, parse_hhmm("12:00")), items[-1].district)
 
-    # 晚餐：先回住宿片区，再吃。不这么做的话晚餐会插在返程路上。
+    # ---------- 收尾前的硬约束：绝不超目标返回时间 ----------
+    # trim_day 的估算按「市中心往返」算、还含路程取整误差，与这里按住宿片区实算的结果
+    # 可能差十几分钟。最后一天赶高铁 / 飞机时这不能接受，所以在这里做最后一次收敛：
+    # 宁可压缩最后一个景点的停留，也不能让「16:00 前返回」落空。
+    # 只有在「最后一天 **且** 用户显式设了返回时间」时才当作赶返程的硬约束 ——
+    # 那通常意味着要赶高铁 / 飞机。中间几天回来晚十几分钟可以接受（会给超时提示），
+    # 不能因此就砍掉一顿晚饭。
+    strict_return = day_index >= total_days and bool(req.last_day_return_time)
+
+    back_probe = leg(city, cur_lat, cur_lng, origin_lat, origin_lng, req.transport).minutes
+    if strict_return and cur_time + back_probe > return_min:
+        excess = cur_time + back_probe - return_min
+        last = next((n for n in reversed(nodes) if n.type == "attraction"), None)
+        if last is not None:
+            cut = min(excess, max(0, last.stay_minutes - MIN_STAY_MINUTES))
+            if cut > 0:
+                last.stay_minutes -= cut
+                note = f"（为按时返回压缩 {cut} 分钟）"
+                last.advice = (last.advice[: 200 - len(note)] + note).strip()
+                cur_time -= cut
+
+    # ---------- 收尾：晚餐 → 回住宿片区 ----------
     back_leg = leg(city, cur_lat, cur_lng, origin_lat, origin_lng, req.transport)
     back = back_leg.minutes
     arrive_back = cur_time + back
-    dinner_at = max(arrive_back, parse_hhmm(DINNER_FROM))
 
-    # 下午早早收工 → 补一个留白节点，否则时间轴上会凭空缺好几个小时
-    if dinner_at - arrive_back > 90:
+    # 能不能排晚餐，取决于「吃完是否还来得及按时返回」。
+    # 最后一天 16:00 赶飞机/高铁时 latest_dinner < EARLIEST_DINNER → 不排晚餐，
+    # 否则 18:00 的晚餐锚点会把结束时间硬拖到 19:25（实测超时 205 分钟）。
+    latest_dinner = return_min - (MEAL_DINNER_MINUTES + DINNER_TO_HOTEL)
+    dinner_at: int | None = None
+    if latest_dinner >= parse_hhmm(EARLIEST_DINNER):
+        dinner_at = max(arrive_back, min(parse_hhmm(DINNER_FROM), latest_dinner))
+        # 最后一站回来得太晚时，上面那个 max 会把晚餐顶到排不下的时刻
+        # （如 18:15 回、19:30 要返程 → 吃完 19:40）。这时宁可不吃，也不超时。
+        if strict_return and dinner_at + MEAL_DINNER_MINUTES + DINNER_TO_HOTEL > return_min:
+            dinner_at = None
+
+    if dinner_at is None:
+        # 赶返程：回到住宿片区就收尾，不排晚餐
         push(
             TimelineNode(
                 time=fmt_hhmm(arrive_back),
-                type="transit",
-                name="返回住宿片区休整 · 自由活动",
-                advice="这一段刻意留白：可以回酒店歇脚，也可以临时加一个住宿片区附近的去处。",
-                stay_minutes=dinner_at - arrive_back,
+                type="hotel",
+                name=f"返回「{hotel.area}」，准备返程",
+                advice=f"{hotel.reason} 今天的目标是 {fmt_hhmm(return_min)} 前返回，行程到此收尾。",
+                stay_minutes=0,
                 travel_minutes=back,
                 travel_mode=back_leg.label,
             )
         )
-        add_meal("dinner", dinner_at, "", gap=0)
     else:
-        add_meal("dinner", dinner_at, "")
+        # 下午早早收工 → 补一个留白节点，否则时间轴上会凭空缺好几个小时
+        if dinner_at - arrive_back > 90:
+            push(
+                TimelineNode(
+                    time=fmt_hhmm(arrive_back),
+                    type="transit",
+                    name="返回住宿片区休整 · 自由活动",
+                    advice="这一段刻意留白：可以回酒店歇脚，也可以临时加一个住宿片区附近的去处。",
+                    stay_minutes=dinner_at - arrive_back,
+                    travel_minutes=back,
+                    travel_mode=back_leg.label,
+                )
+            )
+            add_meal("dinner", dinner_at, "", gap=0)
+        else:
+            add_meal("dinner", dinner_at, "")
 
-    hotel_at = cur_time + DINNER_TO_HOTEL
-    overrun = hotel_at - return_min
-    advice = hotel.reason
-    if overrun > OVERRUN_TOLERANCE:
-        advice += (
-            f" 注意：当天路程较远，实际回到酒店约 {fmt_hhmm(hotel_at)}，"
-            f"比目标时间晚 {overrun} 分钟，建议这天的行程不要再加东西。"
+        hotel_at = cur_time + DINNER_TO_HOTEL
+        overrun = hotel_at - return_min
+        advice = hotel.reason
+        if overrun > OVERRUN_TOLERANCE:
+            advice += (
+                f" 注意：当天路程较远，实际回到酒店约 {fmt_hhmm(hotel_at)}，"
+                f"比目标时间晚 {overrun} 分钟，建议这天的行程不要再加东西。"
+            )
+        push(
+            TimelineNode(
+                time=fmt_hhmm(hotel_at),
+                type="hotel",
+                name=f"入住「{hotel.area}」",
+                advice=advice,
+                stay_minutes=0,
+                travel_minutes=DINNER_TO_HOTEL,
+                travel_mode="步行",
+            )
         )
-    push(
-        TimelineNode(
-            time=fmt_hhmm(hotel_at),
-            type="hotel",
-            name=f"入住「{hotel.area}」",
-            advice=advice,
-            stay_minutes=0,
-            travel_minutes=DINNER_TO_HOTEL,
-            travel_mode="步行",
-        )
-    )
 
     # 丰富度：只看「真实活动」——景点停留 + 全部赶路。
     # 必须排除留白节点（type=transit 的「自由活动」），否则一天只玩 1 小时
