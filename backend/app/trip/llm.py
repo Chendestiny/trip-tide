@@ -299,6 +299,16 @@ def run_pipeline(
                 )
             )
 
+    # ---------- 阶段 ①.5：LLM 审阅分天（读矩阵，硬校验把关） ----------
+    pool_items = [a for g in trimmed for a in g]
+    reviewed = plan_days_with_llm(city, pool_items, req, trimmed)
+    if reviewed is not None:
+        trimmed = reviewed
+        hotels = planner.plan_hotels(city, trimmed)   # 分天变了，住宿片区要重算
+        trace.append("review_days ok")
+    else:
+        trace.append("review_days skipped")
+
     # ---------- 阶段 ②：并行生成每天内容 ----------
     results: dict[int, dict[str, Any]] = {}
     errors: dict[int, str] = {}
@@ -377,6 +387,175 @@ def run_pipeline(
     logger.info("流水线完成：%d 天 / %d 景点 / 并行 %d 路 / %.1fs",
                 days, len(kept), workers, time.time() - t0)
     return plan, trace
+
+
+# ================================================================ 阶段 ①.5：LLM 审阅分天
+PLAN_DAYS_SYSTEM = """你是行程编排助手。系统已按地理邻近度做过一版分天，你负责审阅并微调。
+
+**你会拿到量化的通行时间矩阵（分钟），不要自己估算距离，直接读表。**
+
+不可违背的原则：
+1. **地理第一**：矩阵里通行 ≤15 分钟的景点必须同一天 —— 这类组合若被拆到不同天，方案会被直接拒绝。
+2. 其次是热度与体验：让每天的动线更顺、强度更均衡。
+3. 通勤 >45 分钟的（远郊）和大景点应独占一天。
+
+只输出 JSON，不要任何解释：
+{
+  "days": [{"day": 1, "attraction_ids": [3, 4]}, {"day": 2, "attraction_ids": [7]}],
+  "themes": ["当天主题一句话"],
+  "reasoning": "一句话说明你调整了什么"
+}
+
+硬性要求：
+- 每个 id 必须且只能出现一次，总数与输入完全一致
+- day 从 1 连续递增，天数必须等于给定天数，不允许空天
+- 不要发明输入里没有的 id
+"""
+
+
+def _items_text(city: City, items: list[Attraction], req: PlanRequest) -> str:
+    """景点清单（含级别、远郊标记）——喂给模型的一半上下文。"""
+    lines = []
+    for a in items:
+        flags = []
+        if planner._is_must(a):
+            flags.append("必去")
+        if planner.is_remote(city, a, req.transport):
+            flags.append("远郊")
+        grade = planner.grade_attraction(a)
+        lines.append(
+            f"  id={a.id} {a.name}｜{a.district or '—'}｜{grade}景点｜"
+            f"游览 {a.visit_minutes} 分｜热度 {a.heat}｜{'/'.join(flags) or '普通'}"
+        )
+    return "\n".join(lines)
+
+
+def _matrix_text(city: City, items: list[Attraction], req: PlanRequest) -> str:
+    """通行时间矩阵的紧凑文本。模型读表就行，不必猜距离。"""
+    matrix = planner.travel_matrix(city, items, req.transport)
+    ids = [a.id for a in items]
+    head = "      " + "".join(f"{i:>5}" for i in ids)
+    rows = [head]
+    for a in items:
+        cells = []
+        for b in items:
+            if a.id == b.id:
+                cells.append("    -")
+                continue
+            lo, hi = (a.id, b.id) if a.id < b.id else (b.id, a.id)
+            cells.append(f"{matrix.get((lo, hi), 0):>5}")
+        rows.append(f"{a.id:>4}  " + "".join(cells))
+    return "\n".join(rows)
+
+
+def _plan_days_prompt(
+    city: City, items: list[Attraction], req: PlanRequest, baseline: list[list[Attraction]]
+) -> str:
+    budgets = [planner.day_budget(req, i, req.days) for i in range(1, req.days + 1)]
+    base_text = " ｜ ".join(
+        f"Day{i}: {', '.join(str(a.id) for a in g) or '空'}" for i, g in enumerate(baseline, 1)
+    )
+    return (
+        f"城市：{city.name}｜共 {req.days} 天｜出行方式：{req.transport_label}｜"
+        f"节奏：{req.pace_label}\n"
+        f"每天可用时间（游览 + 赶路）：{budgets} 分钟\n\n"
+        f"景点清单：\n{_items_text(city, items, req)}\n\n"
+        f"通行时间矩阵（分钟，行/列都是景点 id）：\n{_matrix_text(city, items, req)}\n\n"
+        f"系统当前的分天（供参考，可以改）：\n  {base_text}\n\n"
+        f"请审阅后输出 {req.days} 天的最终分天。"
+    )
+
+
+def _validate_days(
+    city: City, req: PlanRequest, items: list[Attraction], groups: list[list[int]]
+) -> str | None:
+    """硬校验 LLM 的分天结果。返回错误说明；None 表示通过。"""
+    want = {a.id for a in items}
+    flat = [i for g in groups for i in g]
+    if sorted(flat) != sorted(want):
+        return "景点必须不重不漏，且只能用输入里给出的 id"
+    if len(groups) != req.days:
+        return f"天数必须是 {req.days}，你给了 {len(groups)}"
+    if any(not g for g in groups):
+        return "不允许出现空天"
+
+    by_id = {a.id: a for a in items}
+    day_of = {aid: idx for idx, g in enumerate(groups, 1) for aid in g}
+
+    # 紧邻（直线 ≤ CLUSTER_MAX_METERS）必须同天 —— 这是「地理第一」的落点
+    for i, a in enumerate(items):
+        for b in items[i + 1:]:
+            close = planner.haversine_m(a.lat, a.lng, b.lat, b.lng) <= planner.CLUSTER_MAX_METERS
+            if close and day_of[a.id] != day_of[b.id]:
+                return f"「{a.name}」与「{b.name}」步行可达，必须排在同一天"
+
+    # 独占型必须独占一天
+    for g in groups:
+        if len(g) > 1:
+            for aid in g:
+                if planner._is_standalone(city, by_id[aid], req.transport):
+                    return f"「{by_id[aid].name}」需要独占一天"
+
+    # 每天不能超出预算
+    for idx, g in enumerate(groups, 1):
+        load = planner._group_load(city, [by_id[i] for i in g], req.transport)
+        budget = planner.day_budget(req, idx, req.days)
+        if load > int(budget * 1.05):
+            return f"Day {idx} 需要 {load} 分钟，超过当天预算 {budget} 分钟"
+
+    return None
+
+
+def plan_days_with_llm(
+    city: City,
+    items: list[Attraction],
+    req: PlanRequest,
+    baseline: list[list[Attraction]],
+) -> list[list[Attraction]] | None:
+    """阶段 ①.5：让 LLM 审阅并微调硬编码的分天。
+
+    **关键设计**：给模型的是量化通行时间矩阵，不是让它猜距离 ——
+    这样才不会重演「凭常识把熊猫基地排到下午」那类错误。
+    输出必须通过 `_validate_days` 才会被采纳；两次都不过就返回 None，
+    调用方继续用硬编码结果（保底，不引入新的失败面）。
+    """
+    if not settings.has_llm or not items:
+        return None
+
+    by_id = {a.id: a for a in items}
+    prompt = _plan_days_prompt(city, items, req, baseline)
+
+    for attempt in (1, 2):
+        try:
+            raw = chat_json(
+                [
+                    {"role": "system", "content": PLAN_DAYS_SYSTEM},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.3,
+                max_tokens=2000,
+            )
+            data = extract_json(raw)
+            raw_days = data.get("days") or []
+            groups = [
+                [int(i) for i in (d.get("attraction_ids") or [])]
+                for d in raw_days
+                if isinstance(d, dict)
+            ]
+            err = _validate_days(city, req, items, groups)
+            if err is None:
+                logger.info(
+                    "LLM 分天审阅通过（第 %d 次）：%s",
+                    attempt, str(data.get("reasoning") or "")[:80],
+                )
+                return [[by_id[i] for i in g] for g in groups]
+            logger.warning("LLM 分天审阅第 %d 次被拒：%s", attempt, err)
+            prompt = f"{prompt}\n\n上一次的方案被拒绝，原因：{err}。请修正后重新输出完整 JSON。"
+        except Exception as exc:  # noqa: BLE001 —— 审阅失败不该影响主流程
+            logger.warning("LLM 分天审阅第 %d 次异常：%s", attempt, exc)
+
+    logger.info("LLM 分天审阅未通过，沿用硬编码分天")
+    return None
 
 
 def _compose_summary(
