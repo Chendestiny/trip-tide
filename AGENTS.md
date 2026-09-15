@@ -129,6 +129,15 @@ venv/Scripts/python ../scripts/check_planner.py    # 规则引擎回归（8 个�
     项目没引 alembic，靠这个轻量迁移在 `init_db()` 里自动 `ALTER TABLE`（幂等）。
     新表不用管 —— `create_all` 会建。忘了加会让老库直接报「Unknown column」。
 
+18. **region 目的地必须全程传「当天过夜点」。** `trim_day(origin=, depart=)`、
+    `materialize_day(depart_from=)`、`_estimate_travel(end_lat=, end_lng=)` 都支持
+    出发地 ≠ 收尾点，缺省会回落 `city.center`——对贵州这种 300km 跨度会把
+    转场日误判成装不下。新增 region 相关逻辑时别用「市中心往返」的老口径。
+
+19. **热度是全国统一 T 级（0~1000），不是城市内相对值。** 排序/性价比逻辑随便用
+    （同城单调），但任何 `>= 某个小数字` 的判定都要想清楚是不是旧尺度的残留
+    ——「必去」的热度线是 `MUST_HEAT=500`，定义在 planner 顶部。
+
 ---
 
 ## 3. 常用操作

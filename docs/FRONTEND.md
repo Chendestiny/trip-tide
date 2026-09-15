@@ -40,7 +40,7 @@ frontend/
     │   ├── TripTabBar.vue  底部标签栏（仅手机可见）
     │   └── TripMap.vue     半屏地图（高德 JS API，缺失/失败降级 SVG）
     └── views/trip/
-        ├── TripHome.vue    ① 城市宫格
+        ├── TripHome.vue    ① 首页：「城市 | 区域」两 tab + 目的地宫格
         ├── TripPick.vue    ② 景点勾选 + 设置面板 + 紧凑度预估
         ├── TripPlan.vue    ③ 按天时间轴（核心页）
         └── TripMe.vue      ④ 历史方案
@@ -377,7 +377,9 @@ useIsWide() → useMediaQuery('(min-width: 641px)')   // 行 26
 
 > ⚠️ 弹层是 `v-if` 控制的，关闭时 DOM 被销毁，所以地图实例必须跟着销毁——否则二次打开会往「已被移除的容器」挂载 → **白屏 + 报错**。`watch(props.open)` + `destroyAmap` 就是为这个加的。改动这个文件时务必回归「开关两次地图弹窗」。
 
-### `TripHome.vue`（285 行）— ① 城市宫格
+### `TripHome.vue`（约 330 行）— ① 首页：「城市 | 区域」两 tab + 目的地宫格
+
+两 tab 靠 `City.kind` 过滤（`city` / `region`）；region 卡片带「环线」角标，点击同样进 `/trip/pick`，引擎按 kind 走不同住宿策略。
 
 | 状态 | 行号 |
 |---|---|
@@ -472,6 +474,8 @@ useIsWide() → useMediaQuery('(min-width: 641px)')   // 行 26
 | 页面 | 调用 | 后端 |
 |---|---|---|
 | TripHome | `getCities()` + `health()` | `service.list_cities` + `main.health` |
+| TripPick（弹窗） | `getSpots(id)` | `GET /attractions/{id}/spots`（SpotSheet，纯静态） |
+| TripPick（筛选） | `district` 多选 chips | 纯前端过滤，`distance_km` 渲染周边/远郊标记 |
 | TripPick | `getAttractions()` / `previewPlan()` / `createPlan()` | `list_attractions` / `preview_plan` / `generate_plan` |
 | TripPlan | `getPlan()` / `adjustPlan()` / `createPlan()` | `get_plan` / `adjust_plan` / `generate_plan` |
 | TripMe | —（纯 localStorage） | `list_plans` 已就绪但未接 |

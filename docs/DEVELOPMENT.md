@@ -37,7 +37,7 @@ venv\Scripts\python -m app.trip.seed --city 成都   # 只灌一个城市
 venv\Scripts\python -m app.trip.seed --list       # 看库里现状
 ```
 
-有 Key 时走「LLM 出名单 → 高德 POI 搜索补坐标」；无 Key 时用离线种子（`data/seed_attractions.json`，8 城 × 20 景 = 160 条）。
+有 Key 时走「LLM 出名单 → 高德 POI 搜索补坐标」；无 Key 时用离线种子（`data/seed_attractions.json`，8 城 + 贵州环线 ≈ 190 条）。
 一次全量约 160–200 次高德请求，受 `AMAP_SLEEP=0.25s` 串行节流，**约 40 秒以上**。
 
 | 参数 | 作用 |

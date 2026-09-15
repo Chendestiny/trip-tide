@@ -38,7 +38,7 @@ V1 交付形态是 **响应式网页版**（Vue 3 + Vite，桌面优先，宽度
 ## 页面流程
 
 ```
-① /trip                城市宫格（8 个热门城市，来自 GET /cities）+ AI 引擎状态提示
+① /trip                首页：「城市 | 区域」两个 tab（kind 过滤）+ AI 引擎状态提示
       ↓ 点城市
 ② /trip/pick?city=成都  景点按 heat 降序，多选高亮
       右侧设置面板（手机是底部浮条）：
@@ -80,12 +80,12 @@ cp .env.example .env      # 填 DATABASE_URL / DEEPSEEK_API_KEY / AMAP_KEY
 
 ```bash
 cd backend
-venv\Scripts\python -m app.trip.seed              # 全部 8 城
+venv\Scripts\python -m app.trip.seed              # 全部目的地（8 城 + 贵州）
 venv\Scripts\python -m app.trip.seed --city 成都   # 只灌一个城市
 venv\Scripts\python -m app.trip.seed --list       # 看库里现状
 ```
 
-有 Key 时走「LLM 出名单 → 高德 POI 搜索补真实坐标」；无 Key 时用离线种子（`data/seed_attractions.json`，8 城 × 20 景 = 160 条）。
+有 Key 时走「LLM 出名单 → 高德 POI 搜索补真实坐标」；无 Key 时用离线种子（`data/seed_attractions.json`，8 城 + 贵州环线 ≈ 190 条）。
 一次全量约 160~200 次高德请求，受 `AMAP_SLEEP=0.25s` 串行节流，约 40 秒以上。
 
 ### 3. 前端

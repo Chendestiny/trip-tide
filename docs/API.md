@@ -15,7 +15,7 @@ Base：`/api/trip`（dev 下由 Vite 把 `/api` 代理到 `127.0.0.1:8000`）
 
 ## 1. GET /api/trip/cities
 
-热门城市列表，按 `heat` 降序。首页宫格用。
+目的地列表，按 `heat` 降序。首页「城市 | 区域」两 tab 按 `kind` 过滤（`city` / `region`），条目含 `region`（大区）与 `attraction_count`。
 
 **响应**
 
