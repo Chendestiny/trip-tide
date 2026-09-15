@@ -35,8 +35,20 @@ logging.basicConfig(
 logger = logging.getLogger("triptide.seed")
 
 SEED_FILE = Path(__file__).resolve().parent / "data" / "seed_attractions.json"
-TARGET_PER_CITY = 26
-AMAP_SLEEP = 0.25  # 控制 QPS，避免被限流
+TARGET_PER_CITY = 22   # 一个城市的景点池参考规模（含远郊，约 3~4 天量）
+AMAP_SLEEP = 0.8       # 控制 QPS。0.25 实测会撞 CUQPS_HAS_EXCEEDED_THE_LIMIT
+SPOT_MAX_KM = 3.0      # 子景点离母景点超过这个距离 → 判定为命中同名地点，丢弃
+EARTH_R_M = 6_371_000.0
+
+
+def _km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """两点球面距离（km）。seed 内部用，不引 planner 避免循环依赖。"""
+    from math import asin, cos, radians, sin, sqrt
+
+    p1, p2 = radians(lat1), radians(lat2)
+    dp, dl = p2 - p1, radians(lng2 - lng1)
+    a = sin(dp / 2) ** 2 + cos(p1) * cos(p2) * sin(dl / 2) ** 2
+    return 2 * EARTH_R_M * asin(sqrt(a)) / 1000.0
 
 LIST_SYSTEM = """你是旅游数据编辑。只输出 JSON，不要任何解释和 Markdown 围栏。"""
 
@@ -121,22 +133,42 @@ def upsert_city(db: Session, payload: dict) -> City:
     return city
 
 
-def _fill_spot_coords(city_name: str, att_name: str, spots: list[dict]) -> int:
+def _fill_spot_coords(
+    city_name: str,
+    att_name: str,
+    spots: list[dict],
+    att_lat: float | None = None,
+    att_lng: float | None = None,
+) -> int:
     """给子景点补 GCJ-02 坐标（高德文本搜索），返回补到的个数。
 
     提示词里明确不让模型写坐标 —— 它报的坐标不可信，统一在这里补。
-    搜不到的（小众点位）就留空，攻略文字仍然保留。
+
+    多轮尝试：`{景点}{子景点}` → `{子景点}` → `{景点} {子景点}`。
+    后两轮容易命中同名地点（「花径」「上清宫」遍地都是），
+    所以命中后做**距离校验**：离母景点超过 SPOT_MAX_KM 一律丢弃，宁可留空。
     """
     got = 0
     for s in spots:
         spot_name = str(s.get("name") or "").strip()
         if not spot_name:
             continue
-        hit = search_poi(f"{att_name}{spot_name}", city_name)
-        time.sleep(AMAP_SLEEP)
-        if hit:
+        for kw in (f"{att_name}{spot_name}", spot_name, f"{att_name} {spot_name}"):
+            hit = search_poi(kw, city_name)
+            time.sleep(AMAP_SLEEP)
+            if not hit:
+                continue
+            if att_lat is not None and att_lng is not None:
+                gap = _km(att_lat, att_lng, hit[0], hit[1])
+                if gap > SPOT_MAX_KM:
+                    logger.debug(
+                        "「%s」命中「%.4f,%.4f」但离母景点 %.1fkm，判为同名地点，丢弃",
+                        kw, hit[0], hit[1], gap,
+                    )
+                    continue
             s["lat"], s["lng"] = hit[0], hit[1]
             got += 1
+            break
     return got
 
 
@@ -185,9 +217,14 @@ def upsert_attractions(
         lat = item.get("lat")
         lng = item.get("lng")
         district = str(item.get("district") or "")
-        coord_source = "seed"
+        # 种子里标了 coord_source=amap 且带坐标的，是上一轮高德校准过的，直接信任，
+        # 不再重复打接口（省配额）；没标记的才走高德检索
+        pre_calibrated = bool(
+            item.get("coord_source") == "amap" and lat is not None and lng is not None
+        )
+        coord_source = "amap" if pre_calibrated else "seed"
 
-        if use_amap:
+        if use_amap and not pre_calibrated:
             hit = search_poi(name, city.name)
             time.sleep(AMAP_SLEEP)
             if hit:
@@ -229,7 +266,10 @@ def upsert_attractions(
         if raw_spots:
             db.flush()  # 新建的景点要到这时才有 id
             if use_amap:
-                _fill_spot_coords(city.name, name, raw_spots)
+                _fill_spot_coords(
+                    city.name, name, raw_spots,
+                    att_lat=row.lat, att_lng=row.lng,
+                )
             upsert_spots(db, row, raw_spots)
 
     db.flush()
