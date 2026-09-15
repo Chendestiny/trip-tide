@@ -278,6 +278,8 @@ class CityOut(BaseModel):
     emoji: str = ""
     tagline: str = ""
     heat: int = 0
+    kind: str = Field("city", description="city=城市+周边；region=区域游（多基地环线）")
+    region: str = Field("", description="所属大区，首页宫格分组用")
     center_lat: float = 0.0
     center_lng: float = 0.0
     attraction_count: int = 0
@@ -312,6 +314,10 @@ class AttractionOut(BaseModel):
     best_time: str = Field("", description="最佳时段 morning/night/museum，空=无约束")
     tags: list[str] = Field(default_factory=list)
     spot_count: int = Field(0, description="内部子景点数；>0 时前端显示详情入口")
+    distance_km: float = Field(
+        0.0,
+        description="离目的地中心（center）的直线距离。前端 ≥30 显示「周边」、≥45 显示「远郊·可就近住」",
+    )
 
 
 class PlanResponse(BaseModel):

@@ -86,6 +86,10 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
     "trip_attraction": {
         "best_time": "VARCHAR(12) NOT NULL DEFAULT ''",
     },
+    "trip_city": {
+        "kind": "VARCHAR(10) NOT NULL DEFAULT 'city'",
+        "region": "VARCHAR(16) NOT NULL DEFAULT ''",
+    },
 }
 
 

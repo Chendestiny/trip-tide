@@ -753,22 +753,31 @@ def estimate_days_needed(
 
 # ================================================================ ④ 逐天裁剪
 def trim_day(
-    city: Any, items: Sequence[Any], req: PlanRequest, per_day_budget: int
+    city: Any,
+    items: Sequence[Any],
+    req: PlanRequest,
+    per_day_budget: int,
+    origin: tuple[float, float] | None = None,
+    depart: tuple[float, float] | None = None,
 ) -> tuple[list[Any], list[Any]]:
     """按当天真实时间预算裁剪，返回 (保留, 溢出)。
 
     预算里含「最后一站回住宿片区」的返程时间——不算返程的话，
     远郊景点会看着能塞进去，实际收尾时间要晚一个多小时。
+    origin 是当天过夜点（收尾点）；depart 是出发地（昨晚过夜点，转场日与 origin 不同）；
+    两者缺省都用 city.center（城市目的地的老口径）。
     至少保留 1 个（否则一整天就空了）。
     """
     kept: list[Any] = []
     overflow: list[Any] = []
     used = 0
-    lat, lng = city.center_lat, city.center_lng
+    olat, olng = origin if origin else (city.center_lat, city.center_lng)
+    dlat, dlng = depart if depart else (olat, olng)
+    lat, lng = dlat, dlng
 
     for item in items:
         t = leg(city, lat, lng, item.lat, item.lng, req.transport).minutes
-        back = leg(city, item.lat, item.lng, city.center_lat, city.center_lng, req.transport).minutes
+        back = leg(city, item.lat, item.lng, olat, olng, req.transport).minutes
         if kept and used + t + item.visit_minutes + back > per_day_budget:
             overflow.append(item)
             continue
@@ -817,15 +826,33 @@ def pick_hotel(city: Any, attractions: Sequence[Any]) -> HotelAdvice:
     )
 
 
-def plan_hotels(city: Any, groups: Sequence[Sequence[Any]]) -> list[HotelAdvice]:
-    """一次定**全程**住宿：默认住同一个片区，只有远郊日才建议就近过夜。
+def _avg_km_hotel(city: Any, hotel: HotelAdvice, items: Sequence[Any]) -> float:
+    """某住宿片区到一组景点的平均直线距离（km）。"""
+    hlat, hlng = _hotel_origin(city, hotel)
+    if not items:
+        return 0.0
+    return (
+        sum(haversine_m(hlat, hlng, a.lat, a.lng) for a in items)
+        / len(items)
+        / 1000.0
+    )
 
-    频繁换酒店是自助游最烦的事之一——每天搬行李、重新认路，性价比极低。
-    所以这里按「全程景点的几何中心」选一个常住片区，只有某天离它太远
-    （OVERNIGHT_KM 以上，比如成都行程里的都江堰日）才建议就近住一晚。
+
+def plan_hotels(city: Any, groups: Sequence[Sequence[Any]]) -> list[HotelAdvice]:
+    """一次定**全程**住宿。城市目的地与区域游目的地的策略不同：
+
+    city（城市+周边，现状）：按「全程景点的几何中心」选一个常住片区，
+        只有远郊日（如成都的都江堰日）才建议就近住一晚，次日回常住片区。
+    region（区域游，贵州这类多基地环线）：**今晚住哪 = 今天走到哪** ——
+        第一晚住当天景点就近基地；连住优先（不搬行李），
+        当天景点离昨晚过夜点太远且本地有明显更优基地时才搬。
     """
     all_items = [a for g in groups for a in g]
     base = pick_hotel(city, all_items)
+
+    if getattr(city, "kind", "city") == "region":
+        return _plan_hotels_region(city, groups, base)
+
     base_lat, base_lng = _hotel_origin(city, base)
 
     out: list[HotelAdvice] = []
@@ -873,6 +900,67 @@ def plan_hotels(city: Any, groups: Sequence[Sequence[Any]]) -> list[HotelAdvice]
                     alternatives=base.alternatives,
                 )
             )
+    return out
+
+
+def _plan_hotels_region(
+    city: Any, groups: Sequence[Sequence[Any]], base: HotelAdvice
+) -> list[HotelAdvice]:
+    """区域游的推进式住宿：链式转场的核心。
+
+    规则（都服务于「少搬行李 + 明天不从 300km 外瞎跑」）：
+      ① 第一晚：住第一天景点就近的基地（base 是全程几何中心，不一定是起点）
+      ② 连住优先：当天景点离昨晚过夜点 ≤OVERNIGHT_KM → 继续住，不动
+      ③ 换住：太远、且本地基地平均距离 < 昨晚基地的 60% → 搬过去
+      ④ 换不动（本地没有明显更优）→ 留在原地硬跑，reason 里提醒早出发
+    """
+    out: list[HotelAdvice] = []
+    cur: HotelAdvice | None = None
+
+    for items in groups:
+        if not items:
+            out.append(cur or base)
+            continue
+
+        local = pick_hotel(city, items)
+        if cur is None:
+            cur = local  # ① 第一晚
+            out.append(cur)
+            continue
+
+        cur_km = _avg_km_hotel(city, cur, items)
+        if cur_km <= OVERNIGHT_KM:
+            out.append(
+                HotelAdvice(
+                    area=cur.area,
+                    reason=f"继续住「{cur.area}」，离今天的景点近，不搬行李。",
+                    alternatives=cur.alternatives,
+                )
+            )
+            continue
+
+        local_km = _avg_km_hotel(city, local, items)
+        if local.area != cur.area and local_km < cur_km * 0.6:
+            cur = HotelAdvice(
+                area=local.area,
+                reason=(
+                    f"今天玩「{local.area}」一带，从「{out[-1].area}」过去平均 {cur_km:.0f} km，"
+                    f"今晚搬过来住（本地平均单程 {local_km:.1f} km），明天从这里出发。"
+                ),
+                alternatives=[
+                    HotelAlternative(area=out[-1].area, tradeoff="不搬行李，但明天一早要多花 2 小时以上车程折返。")
+                ],
+            )
+        else:
+            cur = HotelAdvice(
+                area=cur.area,
+                reason=(
+                    f"继续住「{cur.area}」硬跑今天这一线（换住省不了多少路）。"
+                    f"当天平均单程 {cur_km:.0f} km，务必早出发，行程别再加密。"
+                ),
+                alternatives=cur.alternatives,
+            )
+        out.append(cur)
     return out
 
 
@@ -926,14 +1014,22 @@ def _estimate_travel(
     origin_lat: float,
     origin_lng: float,
     transport: str,
+    end_lat: float | None = None,
+    end_lng: float | None = None,
 ) -> int:
-    """按给定顺序预估当天赶路总时长（含最后一站回住宿片区）。"""
+    """按给定顺序预估当天赶路总时长（含最后一站回住宿片区）。
+
+    origin 是出发地，end 是收尾地；转场日两者不同
+    （昨晚退房处 → … → 今晚入住处），缺省同为一点。
+    """
+    end_lat = origin_lat if end_lat is None else end_lat
+    end_lng = origin_lng if end_lng is None else end_lng
     total = 0
     lat, lng = origin_lat, origin_lng
     for a in items:
         total += leg(city, lat, lng, a.lat, a.lng, transport).minutes
         lat, lng = a.lat, a.lng
-    total += leg(city, lat, lng, origin_lat, origin_lng, transport).minutes
+    total += leg(city, lat, lng, end_lat, end_lng, transport).minutes
     return total
 
 
@@ -975,6 +1071,7 @@ def materialize_day(
     dinner_area: str = "",
     dinner_hint: str = "",
     hotel: HotelAdvice | None = None,
+    depart_from: HotelAdvice | None = None,
     moved_from: dict[int, dict] | None = None,
 ) -> DayPlan:
     """把「当天去哪几个景点」物化成完整时间轴。
@@ -1000,11 +1097,15 @@ def materialize_day(
 
     # 住宿片区：调用方给了就用它的（全程统一或远郊过夜），否则按当天景点群几何中心选
     hotel = hotel or pick_hotel(city, items)
-    origin_lat, origin_lng = _hotel_origin(city, hotel)
+    origin_lat, origin_lng = _hotel_origin(city, hotel)          # 今晚的住处（收尾点）
+    # 转场日：昨晚住在别处（region 环线的上一站），今早从那里退房出发
+    dep_hotel = depart_from or hotel
+    depart_lat, depart_lng = _hotel_origin(city, dep_hotel)
+    is_transit = dep_hotel.area != hotel.area
 
     nodes: list[TimelineNode] = []
     cur_time = start_min
-    cur_lat, cur_lng = origin_lat, origin_lng
+    cur_lat, cur_lng = depart_lat, depart_lng
 
     def push(node: TimelineNode) -> None:
         """所有节点统一从这里进——保证「到达 = 上一站离开 + 路程」永远成立。"""
@@ -1072,11 +1173,21 @@ def materialize_day(
         TimelineNode(
             time=fmt_hhmm(start_min),
             type="depart",
-            name=f"从「{hotel.area}」出发",
-            advice={
-                "drive": "自驾建议提前确认停车场位置，景区周边车位紧张。",
-                "transit": "地铁早高峰较挤，避开 8:00-9:00 换乘大站。",
-            }.get(req.transport, "早高峰建议提前 10 分钟叫车，先到最远的一站再往回走。"),
+            name=(
+                f"从「{dep_hotel.area}」退房出发" if is_transit
+                else f"从「{dep_hotel.area}」出发"
+            ),
+            advice=(
+                (
+                    f"转场日：昨晚住在「{dep_hotel.area}」，今天先赶路去「{hotel.area}」一带，"
+                    f"行李带上车，下午游玩后直接入住新住处。"
+                )
+                if is_transit
+                else {
+                    "drive": "自驾建议提前确认停车场位置，景区周边车位紧张。",
+                    "transit": "地铁早高峰较挤，避开 8:00-9:00 换乘大站。",
+                }.get(req.transport, "早高峰建议提前 10 分钟叫车，先到最远的一站再往回走。")
+            ),
             stay_minutes=0,
             travel_minutes=0,
         )
@@ -1084,7 +1195,8 @@ def materialize_day(
 
     # ---------- 弹性游玩时长 ----------
     base_total = sum(a.visit_minutes for a in items)
-    travel_est = _estimate_travel(city, items, origin_lat, origin_lng, req.transport)
+    # 转场日从「昨晚住处」起算：depart → 景点 → … → 今晚住处，一段不多一段不少
+    travel_est = _estimate_travel(city, items, depart_lat, depart_lng, req.transport, end_lat=origin_lat, end_lng=origin_lng)
     window = return_min - start_min
     available = window - meal_minutes(end_s) - travel_est
     scale = _flex_scale(city, items, req, base_total, available)
@@ -1338,16 +1450,29 @@ def plan_fallback(city: Any, attractions: Sequence[Any], req: PlanRequest) -> Pl
     carried_from: dict[int, dict] = {}
 
     for idx, group in enumerate(groups, start=1):
+        hotel = hotels[idx - 1]
+        # 裁剪按「当天过夜点」估往返：region 目的地的转场日若按市中心估，
+        # 会把住安顺玩黄果树的组合误判成装不下
+        origin = _hotel_origin(city, hotel)
+        prev_hotel = hotels[idx - 2] if idx >= 2 else None
+        depart = _hotel_origin(city, prev_hotel) if prev_hotel else None
+        if depart and depart == origin:
+            depart = None
+
         # 昨天没排下的先插到最前面
         items = list(carried) + list(group)
-        kept_day, overflow = trim_day(city, items, req, day_budget(req, idx, days))
+        kept_day, overflow = trim_day(
+            city, items, req, day_budget(req, idx, days),
+            origin=origin, depart=depart,
+        )
 
         day_plans.append(
             build_day(
                 city, idx, kept_day, req,
                 moved_from=carried_from,
                 total_days=days,
-                hotel=hotels[idx - 1],
+                hotel=hotel,
+                depart_from=prev_hotel if depart else None,
             )
         )
 

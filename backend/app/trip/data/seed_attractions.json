@@ -2803,6 +2803,376 @@
           ]
         }
       ]
+    },
+    {
+      "name": "贵州",
+      "pinyin": "guizhou",
+      "emoji": "🌿",
+      "tagline": "公园省：黄果树瀑布与苗侗风情的山水走廊",
+      "heat": 88,
+      "kind": "region",
+      "region": "西南",
+      "center_lat": 26.6,
+      "center_lng": 106.68,
+      "hotel_areas": [
+        {
+          "area": "贵阳市区（喷水池/大十字）",
+          "lat": 26.586,
+          "lng": 106.713,
+          "pros": "省会枢纽，吃住最便利，黔灵山/甲秀楼近在咫尺。",
+          "cons": "离主力景区都远，只适合首尾两晚。"
+        },
+        {
+          "area": "安顺市区（顾府街）",
+          "lat": 26.245,
+          "lng": 105.933,
+          "pros": "黄果树/龙宫/织金洞的西线枢纽，值得连住两晚。",
+          "cons": "城市本身一般，纯过夜据点。"
+        },
+        {
+          "area": "兴义市区（街心花园）",
+          "lat": 25.088,
+          "lng": 104.897,
+          "pros": "万峰林/马岭河/万峰湖一站式，黔西南大本营。",
+          "cons": "离贵阳 300km，必须连住两晚才值回车程。"
+        },
+        {
+          "area": "荔波县城（樟江边）",
+          "lat": 25.412,
+          "lng": 107.88,
+          "pros": "小七孔门口，次日起床即到景区门口。",
+          "cons": "县城小，旺季房价高。"
+        },
+        {
+          "area": "凯里市区",
+          "lat": 26.583,
+          "lng": 107.985,
+          "pros": "苗侗线枢纽，去西江千户苗寨 40 分钟。",
+          "cons": "景点都在凯里周边，市区本身一般。"
+        },
+        {
+          "area": "镇远古城内",
+          "lat": 27.049,
+          "lng": 108.425,
+          "pros": "住进古城看夜景，舞阳河畔推窗即景。",
+          "cons": "古城内停车难，行李搬运不便。"
+        },
+        {
+          "area": "江口县城（梵净山脚）",
+          "lat": 27.697,
+          "lng": 108.838,
+          "pros": "梵净山早上山首选，山脚住宿便宜。",
+          "cons": "只为梵净山服务，别处用不上。"
+        },
+        {
+          "area": "赤水市区",
+          "lat": 28.589,
+          "lng": 105.697,
+          "pros": "丹霞线的据点，连住两晚玩瀑布竹海。",
+          "cons": "离贵阳 350km，只适合北线加天。"
+        }
+      ],
+      "attractions": [
+        {
+          "name": "黄果树瀑布景区",
+          "district": "安顺",
+          "lat": 25.99,
+          "lng": 105.67,
+          "visit_minutes": 240,
+          "heat": 560,
+          "must_visit": true,
+          "best_time": "",
+          "tags": [
+            "自然",
+            "瀑布"
+          ],
+          "intro": "亚洲第一大瀑布，可从上下左右四个角度环绕观赏，水帘洞穿瀑而过是全国独一份的体验。"
+        },
+        {
+          "name": "荔波小七孔景区",
+          "district": "黔南",
+          "lat": 25.39,
+          "lng": 107.87,
+          "visit_minutes": 300,
+          "heat": 500,
+          "must_visit": true,
+          "best_time": "",
+          "tags": [
+            "自然",
+            "亲子"
+          ],
+          "intro": "地球腰带上的绿宝石，68 级叠水瀑布与鸳鸯湖在一条约 7 公里的峡谷里串成一线。"
+        },
+        {
+          "name": "梵净山",
+          "district": "铜仁",
+          "lat": 27.92,
+          "lng": 108.69,
+          "visit_minutes": 300,
+          "heat": 480,
+          "must_visit": true,
+          "best_time": "",
+          "tags": [
+            "自然",
+            "登山"
+          ],
+          "intro": "世界自然遗产，红云金顶一柱擎天，山顶云海与十万大山的视野是贵州山水的巅峰。"
+        },
+        {
+          "name": "西江千户苗寨",
+          "district": "黔东南",
+          "lat": 26.5,
+          "lng": 108.32,
+          "visit_minutes": 240,
+          "heat": 380,
+          "must_visit": true,
+          "best_time": "night",
+          "tags": [
+            "民俗",
+            "夜景"
+          ],
+          "intro": "全球最大苗寨，上千栋吊脚楼顺山铺开，夜幕亮灯时是贵州最有辨识度的一张名片。"
+        },
+        {
+          "name": "镇远古城",
+          "district": "黔东南",
+          "lat": 27.05,
+          "lng": 108.43,
+          "visit_minutes": 240,
+          "heat": 300,
+          "must_visit": false,
+          "best_time": "night",
+          "tags": [
+            "古镇",
+            "夜景"
+          ],
+          "intro": "舞阳河 S 形穿城的太极古镇，青龙洞贴崖而建，夜景比白天更有味道。"
+        },
+        {
+          "name": "万峰林景区",
+          "district": "黔西南",
+          "lat": 25.06,
+          "lng": 104.93,
+          "visit_minutes": 180,
+          "heat": 280,
+          "must_visit": false,
+          "best_time": "morning",
+          "tags": [
+            "自然",
+            "田园"
+          ],
+          "intro": "喀斯特峰林平地拔起上万座，八卦田与纳灰村嵌在峰林脚下，徐霞客三次到访之地。"
+        },
+        {
+          "name": "织金洞",
+          "district": "毕节",
+          "lat": 26.79,
+          "lng": 105.77,
+          "visit_minutes": 180,
+          "heat": 260,
+          "must_visit": false,
+          "best_time": "",
+          "tags": [
+            "自然",
+            "溶洞"
+          ],
+          "intro": "中国最美溶洞之首，石笋规模远超常见溶洞，两小时走完一场地心奇观。"
+        },
+        {
+          "name": "赤水丹霞旅游区",
+          "district": "遵义",
+          "lat": 28.34,
+          "lng": 105.76,
+          "visit_minutes": 240,
+          "heat": 260,
+          "must_visit": false,
+          "best_time": "",
+          "tags": [
+            "自然",
+            "瀑布"
+          ],
+          "intro": "世界自然遗产，丹霞赤壁与十丈洞大瀑布，竹海与桫椤让红色岩壁生机盎然。"
+        },
+        {
+          "name": "龙宫景区",
+          "district": "安顺",
+          "lat": 26.18,
+          "lng": 105.9,
+          "visit_minutes": 150,
+          "heat": 240,
+          "must_visit": false,
+          "best_time": "",
+          "tags": [
+            "自然",
+            "溶洞"
+          ],
+          "intro": "水溶旱溶兼备的喀斯特迷宫，乘船进入暗河溶洞，龙门飞瀑落差 50 米。"
+        },
+        {
+          "name": "肇兴侗寨",
+          "district": "黔东南",
+          "lat": 26.09,
+          "lng": 109.13,
+          "visit_minutes": 180,
+          "heat": 240,
+          "must_visit": false,
+          "best_time": "",
+          "tags": [
+            "民俗",
+            "古镇"
+          ],
+          "intro": "全国最大侗寨，五座鼓楼沿河谷排开，侗族大歌生生不息，比西江安静得多。"
+        },
+        {
+          "name": "马岭河峡谷",
+          "district": "黔西南",
+          "lat": 25.11,
+          "lng": 104.87,
+          "visit_minutes": 180,
+          "heat": 220,
+          "must_visit": false,
+          "best_time": "",
+          "tags": [
+            "自然",
+            "探险"
+          ],
+          "intro": "地球上最美丽的伤疤，谷深 200 米，夏季百瀑齐发，可体验峡谷漂流。"
+        },
+        {
+          "name": "遵义会议会址",
+          "district": "遵义",
+          "lat": 27.69,
+          "lng": 106.92,
+          "visit_minutes": 90,
+          "heat": 200,
+          "must_visit": false,
+          "best_time": "museum",
+          "tags": [
+            "历史",
+            "红色"
+          ],
+          "intro": "中国革命转折点的发生地，免费参观，会址小楼与陈列馆一小时看完整段历史。"
+        },
+        {
+          "name": "青岩古镇",
+          "district": "贵阳",
+          "lat": 26.33,
+          "lng": 106.69,
+          "visit_minutes": 150,
+          "heat": 180,
+          "must_visit": false,
+          "best_time": "",
+          "tags": [
+            "古镇",
+            "美食"
+          ],
+          "intro": "明代军事古镇，青石板与石头墙保存完整，状元蹄与玫瑰糖是镇上双绝。"
+        },
+        {
+          "name": "黔灵山公园",
+          "district": "贵阳",
+          "lat": 26.61,
+          "lng": 106.67,
+          "visit_minutes": 150,
+          "heat": 150,
+          "must_visit": false,
+          "best_time": "morning",
+          "tags": [
+            "自然",
+            "亲子"
+          ],
+          "intro": "市中心的天然山林，野猴散养在路边，弘福寺与瞰筑亭俯看全城，本地人晨练主场。"
+        },
+        {
+          "name": "二十四道拐",
+          "district": "黔西南",
+          "lat": 25.83,
+          "lng": 105.16,
+          "visit_minutes": 90,
+          "heat": 140,
+          "must_visit": false,
+          "best_time": "",
+          "tags": [
+            "历史",
+            "自驾"
+          ],
+          "intro": "抗战生命线史迪威公路的标志性弯道，观景台一眼看尽 24 道发卡弯。"
+        },
+        {
+          "name": "天河潭旅游度假区",
+          "district": "贵阳",
+          "lat": 26.44,
+          "lng": 106.58,
+          "visit_minutes": 180,
+          "heat": 130,
+          "must_visit": false,
+          "best_time": "",
+          "tags": [
+            "自然",
+            "溶洞"
+          ],
+          "intro": "溶洞与瀑布组合的近郊景区，坐船入洞、索道出谷，离贵阳市区仅 24 公里。"
+        },
+        {
+          "name": "万峰湖",
+          "district": "黔西南",
+          "lat": 24.83,
+          "lng": 104.98,
+          "visit_minutes": 150,
+          "heat": 130,
+          "must_visit": false,
+          "best_time": "",
+          "tags": [
+            "自然",
+            "休闲"
+          ],
+          "intro": "万峰林脚下的高原湖泊，湖上峰林倒影，乘船游湖是兴义线的下半场。"
+        },
+        {
+          "name": "岜沙苗寨",
+          "district": "黔东南",
+          "lat": 25.83,
+          "lng": 109.09,
+          "visit_minutes": 120,
+          "heat": 130,
+          "must_visit": false,
+          "best_time": "",
+          "tags": [
+            "民俗"
+          ],
+          "intro": "『最后的枪手部落』，镰刀剃头的成人礼与火枪迎宾都是活着的民俗，藏在从江深山。"
+        },
+        {
+          "name": "花溪十里河滩湿地公园",
+          "district": "贵阳",
+          "lat": 26.41,
+          "lng": 106.67,
+          "visit_minutes": 120,
+          "heat": 120,
+          "must_visit": false,
+          "best_time": "",
+          "tags": [
+            "自然",
+            "休闲"
+          ],
+          "intro": "国家城市湿地公园，骑行与步道沿河十里，秋冬水杉金黄，贵阳人的周末后花园。"
+        },
+        {
+          "name": "甲秀楼",
+          "district": "贵阳",
+          "lat": 26.57,
+          "lng": 106.72,
+          "visit_minutes": 45,
+          "heat": 120,
+          "must_visit": false,
+          "best_time": "night",
+          "tags": [
+            "地标",
+            "夜景"
+          ],
+          "intro": "贵阳城市地标，明代三层阁楼立在南明河鳌矶石上，亮灯后的倒影是贵阳的门面。"
+        }
+      ]
     }
   ]
 }

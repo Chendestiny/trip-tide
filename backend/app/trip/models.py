@@ -43,6 +43,13 @@ class City(Base):
     emoji: Mapped[str] = mapped_column(String(8), default="", comment="宫格图标")
     tagline: Mapped[str] = mapped_column(String(64), default="", comment="一句话卖点")
     heat: Mapped[int] = mapped_column(Integer, default=0, comment="城市热度，宫格排序用")
+    kind: Mapped[str] = mapped_column(
+        String(10), default="city",
+        comment="目的地类型：city=城市+周边（现状）；region=区域游（贵州，多基地环线）",
+    )
+    region: Mapped[str] = mapped_column(
+        String(16), default="", comment="所属大区，首页宫格分组用：西南/华东/西北…",
+    )
     center_lat: Mapped[float] = mapped_column(Float, default=0.0, comment="市中心纬度 GCJ-02")
     center_lng: Mapped[float] = mapped_column(Float, default=0.0, comment="市中心经度 GCJ-02")
     hotel_areas: Mapped[list] = mapped_column(

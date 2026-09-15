@@ -26,7 +26,14 @@
           </svg>
         </section>
 
-        <div class="sec-title">热门城市</div>
+        <!-- 城市 | 区域 两个入口（kind: city / region） -->
+        <div class="sec-title-row">
+          <div class="home-tabs">
+            <button :class="{ on: tab === 'city' }" @click="tab = 'city'">城市</button>
+            <button :class="{ on: tab === 'region' }" @click="tab = 'region'">区域</button>
+          </div>
+          <span class="home-tab-note">{{ tabNote }}</span>
+        </div>
 
         <div v-if="loading" class="city-grid">
           <div v-for="i in 8" :key="i" class="city-card skeleton" />
@@ -39,16 +46,18 @@
         </div>
 
         <div v-else class="city-grid">
-          <button v-for="c in cities" :key="c.id" class="city-card" @click="goPick(c)">
+          <button v-for="c in shown" :key="c.id" class="city-card" @click="goPick(c)">
             <span class="city-emoji">{{ c.emoji || '📍' }}</span>
+            <span v-if="c.kind === 'region'" class="chip kind-tag">环线</span>
             <span class="city-name">{{ c.name }}</span>
             <span class="city-tag">{{ c.tagline }}</span>
             <span class="city-count">{{ c.attraction_count }} 个景点</span>
           </button>
         </div>
 
-        <p v-if="!loading && !error && !cities.length" class="hint">
-          库里还没有城市数据。先跑一次初始化：<code>npm run seed</code>
+        <p v-if="!loading && !error && !shown.length" class="hint">
+          <template v-if="tab === 'region'">区域游目的地筹备中，敬请期待</template>
+          <template v-else>库里还没有城市数据。先跑一次初始化：<code>npm run seed</code></template>
         </p>
       </div>
     </PhoneShell>
@@ -69,6 +78,13 @@ const cities = ref([])
 const loading = ref(true)
 const error = ref('')
 const h = ref(null)
+const tab = ref('city')
+
+// 城市 = 单城+周边（现状）；区域 = 环线游（贵州这类多基地目的地）
+const shown = computed(() => cities.value.filter((c) => (c.kind || 'city') === tab.value))
+const tabNote = computed(() =>
+  tab.value === 'city' ? '选一个城市，勾景点就出发' : '一次玩一条线，AI 会安排转场与住宿'
+)
 
 const engineTip = computed(() => {
   if (!h.value) return null
@@ -169,6 +185,35 @@ onMounted(() => {
   backdrop-filter: blur(6px);
 }
 .engine-tip.warn { background: rgba(255, 176, 96, 0.24); border-color: rgba(255, 200, 140, 0.3); }
+
+/* ================================================================
+   城市 | 区域 tab
+   ================================================================ */
+.sec-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 12px;
+}
+.home-tabs {
+  display: inline-flex; gap: 3px; padding: 3px;
+  background: var(--surface-3); border-radius: 10px;
+}
+.home-tabs button {
+  padding: 6px 18px; border-radius: 8px;
+  font-size: 13.5px; font-weight: 620; color: var(--ink-3);
+  transition: background 0.16s var(--ease), color 0.16s var(--ease), box-shadow 0.16s var(--ease);
+}
+.home-tabs button.on {
+  background: var(--surface); color: var(--brand);
+  box-shadow: var(--sh-1);
+}
+.home-tab-note { font-size: 12px; color: var(--ink-4); }
+
+.kind-tag {
+  position: absolute; right: 12px; top: 12px;
+  background: var(--gold-soft); color: #9c6c14;
+  font-size: 10.5px; font-weight: 680; padding: 2px 8px;
+  border-radius: 6px; z-index: 2;
+}
 
 /* ================================================================
    城市宫格
@@ -274,6 +319,9 @@ onMounted(() => {
   .hero-art { display: none; }
 
   .city-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sec-title-row { margin-bottom: 10px; }
+  .home-tabs button { padding: 5px 14px; font-size: 12.5px; }
+  .home-tab-note { display: none; }
   .city-card { padding: 13px 12px 11px; border-radius: var(--r); }
   .city-card:hover { transform: none; box-shadow: var(--sh-1); }
   .city-emoji { width: 36px; height: 36px; border-radius: 9px; font-size: 19px; }

@@ -93,6 +93,10 @@ def list_attractions(db: Session, city_key: str) -> list[AttractionOut]:
     for r in rows:
         item = AttractionOut.model_validate(r)
         item.spot_count = counts.get(r.id, 0)
+        # 离目的地中心的直线距离：前端 30/45 km 分档显示「周边 / 远郊」标记
+        item.distance_km = round(
+            planner.haversine_m(city.center_lat, city.center_lng, r.lat, r.lng) / 1000.0, 1
+        )
         out.append(item)
     return out
 
@@ -459,8 +463,9 @@ def adjust_plan(db: Session, plan_id: int, patch: PlanRequest) -> PlanResponse:
         if not items:
             day_plans.append(planner.empty_day(city, patch, idx, hotels[idx - 1]))
             continue
+        origin = planner._hotel_origin(city, hotels[idx - 1])
         kept, spilled = planner.trim_day(
-            city, items, patch, planner.day_budget(patch, idx, patch.days)
+            city, items, patch, planner.day_budget(patch, idx, patch.days), origin=origin
         )
         for a in spilled:
             dropped.append(
@@ -481,6 +486,7 @@ def adjust_plan(db: Session, plan_id: int, patch: PlanRequest) -> PlanResponse:
         day_plans.append(
             planner.materialize_day(
                 city, idx, kept, patch,
+                depart_from=hotels[idx - 2] if idx >= 2 else None,
                 total_days=patch.days,
                 hotel=hotels[idx - 1],
                 theme=theme,

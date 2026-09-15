@@ -132,6 +132,9 @@ def upsert_city(db: Session, payload: dict) -> City:
     city.emoji = payload.get("emoji") or city.emoji or ""
     city.tagline = payload.get("tagline") or city.tagline or ""
     city.heat = int(payload.get("heat") or city.heat or 0)
+    # kind: city=城市+周边（默认）；region=区域游（贵州/北疆环线这类多基地目的地）
+    city.kind = str(payload.get("kind") or city.kind or "city")
+    city.region = str(payload.get("region") or city.region or "")
     city.center_lat = float(payload.get("center_lat") or city.center_lat or 0)
     city.center_lng = float(payload.get("center_lng") or city.center_lng or 0)
     city.hotel_areas = payload.get("hotel_areas") or city.hotel_areas or []

@@ -65,8 +65,19 @@
         <!-- 左：景点列表 -->
         <div class="pick-main">
           <div class="pick-bar">
-            <span>{{ attractions.length }} 个景点 · 按热度排序</span>
+            <span>{{ visibleAttractions.length }} 个景点 · 按热度排序</span>
             <span v-if="selectedIds.length" class="pick-bar-num">已选 {{ selectedIds.length }}</span>
+          </div>
+
+          <!-- 子区域筛选（多选）：region 目的地的景点分散在各地州，先框范围再勾 -->
+          <div v-if="allAreas.length > 1" class="area-chips">
+            <button
+              v-for="d in allAreas"
+              :key="d"
+              :class="['area-chip', { on: areaFilter.includes(d) }]"
+              @click="toggleArea(d)"
+            >{{ d }}</button>
+            <button v-if="areaFilter.length" class="area-chip clear" @click="areaFilter = []">全部</button>
           </div>
 
           <div v-if="loading" class="att-grid">
@@ -81,7 +92,7 @@
 
           <div v-else class="att-grid">
             <button
-              v-for="a in attractions"
+              v-for="a in visibleAttractions"
               :key="a.id"
               :class="['att', { on: isOn(a.id) }]"
               @click="toggle(a.id)"
@@ -91,6 +102,8 @@
                   <span class="att-name">{{ a.name }}</span>
                   <span v-if="a.must_visit" class="chip must">⭐ 必去</span>
                   <span class="chip hot">🔥 {{ a.heat }}</span>
+                  <span v-if="a.distance_km >= 45" class="chip hot">🚌 远郊 · 可就近住</span>
+                  <span v-else-if="a.distance_km >= 30" class="chip">🚗 周边</span>
                 </div>
                 <p class="att-intro">{{ a.intro }}</p>
                 <div class="att-meta">
@@ -307,8 +320,26 @@ const STEPS = [
 
 const isOn = (id) => selectedIds.value.includes(id)
 const allSelected = computed(
-  () => attractions.value.length > 0 && selectedIds.value.length === attractions.value.length
+  () =>
+    visibleAttractions.value.length > 0 &&
+    visibleAttractions.value.every((a) => selectedIds.value.includes(a.id))
 )
+
+// ---------- 子区域筛选（多选，空 = 全部） ----------
+const areaFilter = ref([])
+const allAreas = computed(() => [
+  ...new Set(attractions.value.map((a) => a.district).filter(Boolean)),
+])
+const visibleAttractions = computed(() =>
+  areaFilter.value.length
+    ? attractions.value.filter((a) => areaFilter.value.includes(a.district))
+    : attractions.value
+)
+function toggleArea(d) {
+  areaFilter.value = areaFilter.value.includes(d)
+    ? areaFilter.value.filter((x) => x !== d)
+    : [...areaFilter.value, d]
+}
 
 const warn = computed(() => {
   const n = selectedIds.value.length
@@ -359,7 +390,10 @@ function toggle(id) {
 }
 
 function toggleAll() {
-  selectedIds.value = allSelected.value ? [] : attractions.value.map((a) => a.id)
+  const ids = visibleAttractions.value.map((a) => a.id)
+  selectedIds.value = allSelected.value
+    ? selectedIds.value.filter((id) => !ids.includes(id))
+    : [...new Set([...selectedIds.value, ...ids])]
 }
 
 async function load() {
@@ -645,6 +679,21 @@ watch(city, load)
 .set-check input { margin: 3px 0 0; accent-color: var(--brand); flex-shrink: 0; }
 
 /* ---------- 紧凑度 ---------- */
+/* 子区域筛选 chips */
+.area-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 10px; }
+.area-chip {
+  padding: 4px 12px; border-radius: 14px;
+  border: 1px solid var(--line-2); background: var(--surface);
+  font-size: 12px; font-weight: 550; color: var(--ink-3);
+  transition: all 0.16s var(--ease);
+}
+.area-chip:hover { border-color: var(--brand); color: var(--brand); }
+.area-chip.on {
+  background: var(--brand); border-color: var(--brand);
+  color: #fff; font-weight: 620;
+}
+.area-chip.clear { border-style: dashed; }
+
 .load-box {
   padding: 10px 12px; border-radius: 8px;
   border: 1px solid var(--line);

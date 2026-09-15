@@ -285,10 +285,13 @@ def run_pipeline(
     hotels = planner.plan_hotels(city, groups)
     trace.append(f"plan_days days={days} kept={len(kept)} dropped={len(dropped)}")
 
-    # 逐天裁剪（时间窗可能首末天不同）
+    # 逐天裁剪（时间窗可能首末天不同；按当天过夜点估往返，region 转场日才能算准）
     trimmed: list[list[Attraction]] = []
     for idx, group in enumerate(groups, start=1):
-        day_kept, spilled = planner.trim_day(city, group, req, planner.day_budget(req, idx, days))
+        origin = planner._hotel_origin(city, hotels[idx - 1])
+        day_kept, spilled = planner.trim_day(
+            city, group, req, planner.day_budget(req, idx, days), origin=origin
+        )
         trimmed.append(day_kept)
         for a in spilled:
             dropped.append(
@@ -345,6 +348,7 @@ def run_pipeline(
             city, idx, items, req,
             total_days=days,
             hotel=hotels[idx - 1],
+            depart_from=hotels[idx - 2] if idx >= 2 else None,
         )
 
         data = results.get(idx)
@@ -355,6 +359,7 @@ def run_pipeline(
                 city, idx, items, req,
                 total_days=days,
                 hotel=hotels[idx - 1],
+                depart_from=hotels[idx - 2] if idx >= 2 else None,
                 theme=dp.theme,
                 advice=notes,
                 lunch_area=l_area,
