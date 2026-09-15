@@ -351,16 +351,27 @@ def _drop_reason(city: Any, item: Any, transport: str, days: int) -> str:
 
 
 def prune_to_capacity(
-    city: Any, attractions: Sequence[Any], req: PlanRequest, per_day_budget: int
+    city: Any,
+    attractions: Sequence[Any],
+    req: PlanRequest,
+    capacity_minutes: int | None = None,
 ) -> tuple[list[Any], list[DroppedItem]]:
-    """总时长超预算时，按性价比从低到高丢弃，直到装得下。
+    """总时长超容量时，按性价比从低到高丢弃，直到装得下。
 
     先裁再排，是为了避免「排到最后一天才发现塞不下，结果把必去景点丢了」——
     那种情况下丢掉的往往不是最该丢的那个。
+
+    `capacity_minutes` 是「逐天可用预算之和」；**不传就自己按逐天求和算**。
+    早先用 `min(单天预算) × 天数` 是错的：首末天时间窗不同时（第一天中午才到、
+    最后一天要赶飞机），会把整趟都按最紧的那天算，容量低估 40% 以上 → 误判超载。
     """
     kept = list(attractions)
     dropped: list[DroppedItem] = []
-    capacity = per_day_budget * req.days * CAPACITY_SLACK
+    if capacity_minutes is None:
+        capacity_minutes = sum(
+            day_budget(req, i, req.days) for i in range(1, req.days + 1)
+        )
+    capacity = int(capacity_minutes * CAPACITY_SLACK)
 
     while len(kept) > 1:
         total = sum(_cost(city, a, req.transport) for a in kept)
@@ -666,6 +677,25 @@ def pick_attractions(
         acc += a.visit_minutes
 
     return picked or items[:1]
+
+
+def estimate_days_needed(
+    city: Any, attractions: Sequence[Any], transport: str
+) -> int:
+    """「按片区排最舒服需要几天」——用于给用户提示，**不用作硬判定**。
+
+    口径是分天算法的地理理想值：大景点 / 远郊各占一天，其余每个片区簇占一天
+    （簇不可拆）。实际天数不够时 `assign_days` 会合并簇、每天跨片区跑，
+    所以它只是「舒适下限」，不是「能不能排下」的界限。
+    """
+    items = list(attractions)
+    if not items:
+        return 0
+    standalone = [a for a in items if _is_standalone(city, a, transport)]
+    sids = {a.id for a in standalone}
+    normal = [a for a in items if a.id not in sids]
+    clusters = cluster_attractions(city, normal, transport) if normal else []
+    return len(standalone) + len(clusters)
 
 
 # ================================================================ ④ 逐天裁剪
@@ -1197,11 +1227,8 @@ def plan_fallback(city: Any, attractions: Sequence[Any], req: PlanRequest) -> Pl
     attractions = list(attractions)
     days = req.days
 
-    # 首末天的时间窗可能不同，取「最紧的一天」当容量基准（保守估计）
-    per_day_budget = min(day_budget(req, i, days) for i in range(1, days + 1))
-
-    # ① 容量裁剪
-    kept, dropped = prune_to_capacity(city, attractions, req, per_day_budget)
+    # ① 容量裁剪（容量 = 逐天预算求和，由 prune_to_capacity 自己算）
+    kept, dropped = prune_to_capacity(city, attractions, req)
     # ②③ 独占型隔离 + 成链均分
     groups = assign_days(city, kept, days, req.transport, req.pace)
     # 住宿：一次定全程，只有远郊日才换

@@ -177,7 +177,7 @@ def _tool_plan_days(s: PlanSession, args: dict) -> dict:
         - (planner.MEAL_LUNCH_MINUTES + planner.MEAL_DINNER_MINUTES),
     )
 
-    kept, over = planner.prune_to_capacity(s.city, picked, req, budget)
+    kept, over = planner.prune_to_capacity(s.city, picked, req)
     groups = planner.assign_days(s.city, kept, days, transport, req.pace)
 
     out_days = []

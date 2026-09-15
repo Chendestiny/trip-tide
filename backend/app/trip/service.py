@@ -107,18 +107,27 @@ def _load_selected(db: Session, city: City, ids: list[int]) -> list[Attraction]:
 
 # ================================================================ 紧凑度预估
 def preview_plan(db: Session, req: PlanRequest) -> PlanPreview:
-    """纯硬编码预估：这些景点按这个天数排会有多紧、哪些会被舍弃。
+    """纯硬编码预估：这份清单排这个天数，是偏松、刚好，还是装不下。
 
     选景点页实时调用（毫秒级，不碰 LLM），让用户在点「开始规划」之前就知道结果。
+
+    **判定不再看「时间占用率」**——那个指标对天数不敏感（分子分母同比例增长），
+    永远算不出「6 天只排了 4 天的量」这种事。现在直接比较两个天数：
+
+        最少需要几天（地理下限 = 大景点/远郊各一天 + 每个片区簇一天）
+        vs
+        用户设的天数
     """
     city = resolve_city(db, req.city)
     attractions = _load_selected(db, city, req.attraction_ids)
     days = req.days
 
-    per_day_budget = min(planner.day_budget(req, i, days) for i in range(1, days + 1))
-    capacity = per_day_budget * days
-    kept, will_drop = planner.prune_to_capacity(city, attractions, req, per_day_budget)
+    # ① 容量裁剪（容量口径 = 逐天预算求和）② 地理优先分天
+    kept, will_drop = planner.prune_to_capacity(city, attractions, req)
     groups = planner.assign_days(city, kept, days, req.transport, req.pace)
+
+    # 「按片区排最舒服需要几天」——只作提示，不作判定依据（簇是可以合并的）
+    days_needed = planner.estimate_days_needed(city, kept, req.transport)
 
     visit_total = 0
     travel_total = 0
@@ -132,14 +141,9 @@ def preview_plan(db: Session, req: PlanRequest) -> PlanPreview:
             )
 
         used = sum(a.visit_minutes for a in day_kept)
+        day_load = planner._group_load(city, day_kept, req.transport) if day_kept else 0
         visit_total += used
-        lat, lng = city.center_lat, city.center_lng
-        for a in day_kept:
-            travel_total += planner.leg(city, lat, lng, a.lat, a.lng, req.transport).minutes
-            lat, lng = a.lat, a.lng
-        travel_total += planner.leg(
-            city, lat, lng, city.center_lat, city.center_lng, req.transport
-        ).minutes
+        travel_total += max(0, day_load - used)
 
         start_s, _ = planner.day_window(req, idx, days)
         per_day.append({
@@ -151,42 +155,64 @@ def preview_plan(db: Session, req: PlanRequest) -> PlanPreview:
             "names": [a.name for a in day_kept],
         })
 
-    # 紧凑度不能只看负载率——被舍弃的景点也是「装不下」的证据。
-    # 10 个景点排 1 天、塞进 4 个丢掉 6 个，负载率照样好看，但那显然不是「刚好」。
+    capacity = sum(planner.day_budget(req, i, days) for i in range(1, days + 1))
     load = (visit_total + travel_total) / max(1, capacity)
-    drop_ratio = len(will_drop) / max(1, len(attractions))
 
-    if drop_ratio > 0.25 or load > 1.05:
+    # 判定：**勾选总量摊到每天，再和节奏目标比**。
+    #
+    # 为什么用「勾选总量」而不是「排入总量」：后者会随天数增加而增加
+    # （天数多 → 容量裁剪丢得少 → 排入更多），导致加天数时日均几乎不降，
+    # 反而看不出松紧变化。用勾选总量，日均会随天数单调下降，才符合直觉。
+    # 也不看「时间占用率」：它分子分母同随天数增长，加天数几乎不动。
+    wanted_visit = sum(a.visit_minutes for a in attractions)
+    avg_visit = wanted_visit / max(1, days)
+    target = planner.PACE_TARGET_MINUTES.get(req.pace, 360)
+    ratio = avg_visit / max(1, target)
+
+    if ratio >= 1.5:
         tightness = "超载"
-    elif drop_ratio > 0.08 or load > 0.88:
+    elif ratio >= 1.0:
         tightness = "紧凑"
-    elif load > 0.6:
+    elif ratio >= 0.65:
         tightness = "适中"
     else:
         tightness = "轻松"
 
+    # 有景点被舍弃 → 至少算「紧凑」；丢得多了直接「超载」
+    drop_ratio = len(will_drop) / max(1, len(attractions))
+    if drop_ratio > 0.25:
+        tightness = "超载"
+    elif drop_ratio > 0 and tightness in ("轻松", "适中"):
+        tightness = "紧凑"
+
     names = [d.name for d in will_drop]
     short = "、".join(names[:3]) + ("…" if len(names) > 3 else "")
-    per_day_visit = visit_total // max(1, days)
+    n_sel = len(attractions)
+    pace_label = req.pace_label
+    next_hint = "已经是 7 天上限，建议减少景点" if days >= 7 else f"加到 {days + 1} 天"
 
-    if tightness == "超载":
+    if tightness == "轻松":
         suggestion = (
-            f"{len(attractions)} 个景点排 {days} 天装不下，约 {len(names)} 个会被舍弃（{short}）。"
-            f"想都去建议加到 {min(7, days + 1)} 天，或把远郊景点去掉。"
+            f"{n_sel} 个景点摊到 {days} 天，日均游览约 {avg_visit:.0f} 分钟，"
+            f"低于「{pace_label}」的 {target} 分钟目标 —— 安排偏松。"
+            f"可以再多勾几个景点，或者把天数减少一些。"
+        )
+    elif tightness == "适中":
+        suggestion = (
+            f"{n_sel} 个景点摊到 {days} 天，日均游览约 {avg_visit:.0f} 分钟，"
+            f"接近「{pace_label}」的 {target} 分钟目标，节奏正常。"
         )
     elif tightness == "紧凑":
+        tail = f"，并且会舍弃 {len(names)} 个（{short}）" if names else ""
         suggestion = (
-            f"{days} 天排下来会舍弃 {len(names)} 个（{short}），其余能排进去，节奏偏紧。"
-            if names
-            else f"{days} 天刚好排得下，节奏偏紧，每天约 {per_day_visit} 分钟在景点里。"
+            f"{n_sel} 个景点摊到 {days} 天，日均游览约 {avg_visit:.0f} 分钟，"
+            f"高于「{pace_label}」的 {target} 分钟目标{tail}。{next_hint}会舒服些。"
         )
-    elif tightness == "轻松":
-        suggestion = "安排偏松还有余量，可以再勾几个景点，或者减一天。"
     else:
+        tail = f"，会舍弃 {len(names)} 个（{short}）" if names else ""
         suggestion = (
-            f"{days} 天排下来会舍弃 {len(names)} 个（{short}），整体节奏适中。"
-            if names
-            else f"{days} 天节奏刚好，每天约 {per_day_visit} 分钟在景点里。"
+            f"{n_sel} 个景点摊到 {days} 天，日均游览约 {avg_visit:.0f} 分钟，"
+            f"远超「{pace_label}」的 {target} 分钟目标{tail}。{next_hint}。"
         )
 
     return PlanPreview(
@@ -201,6 +227,7 @@ def preview_plan(db: Session, req: PlanRequest) -> PlanPreview:
         capacity_minutes=capacity,
         load_ratio=round(load, 2),
         tightness=tightness,
+        days_needed=days_needed,
         per_day=per_day,
         will_drop=names,
         suggestion=suggestion,

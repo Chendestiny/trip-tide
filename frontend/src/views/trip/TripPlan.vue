@@ -35,6 +35,21 @@
             <span v-else-if="plan.source === 'tweak'" class="chip must">倾向微调</span>
             <span v-else class="chip must">AI 生成</span>
           </div>
+
+          <!-- 按天速览：一眼看清 Day1~DayN 各去哪儿，点一条跳到当天时间轴 -->
+          <div class="ov-days">
+            <button
+              v-for="dp in plan.result.day_plans"
+              :key="dp.day"
+              class="ov-day"
+              @click="jumpToDay(dp.day)"
+            >
+              <span class="ov-day-no" :style="{ background: dayColor(dp.day) }">
+                Day {{ dp.day }}
+              </span>
+              <span class="ov-day-text">{{ dayBrief(dp) }}</span>
+            </button>
+          </div>
         </div>
 
         <div class="plan-layout">
@@ -44,6 +59,7 @@
             <div
               v-for="dp in plan.result.day_plans"
               :key="dp.day"
+              :id="`trip-day-${dp.day}`"
               class="day card"
               :style="{ '--dc': dayColor(dp.day) }"
             >
@@ -313,6 +329,20 @@ const summarySegments = computed(() => {
     })
 })
 
+/** 当天景点名串，用于总览区的按天速览 */
+function dayBrief(dp) {
+  const names = (dp.nodes || [])
+    .filter((n) => n.type === 'attraction')
+    .map((n) => n.name)
+  return names.length ? names.join(' → ') : '机动日 · 自由安排'
+}
+
+/** 点速览行 → 平滑滚到当天的时间轴卡片 */
+function jumpToDay(day) {
+  const el = document.getElementById(`trip-day-${day}`)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 const toggle = (k) => { open[k] = !open[k] }
 const fmtMin = (m) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? (m % 60) + 'm' : ''}` : `${m}m`)
 
@@ -438,6 +468,24 @@ onMounted(load)
 }
 .ov-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* ---------- 按天速览 ---------- */
+.ov-days {
+  display: flex; flex-direction: column; gap: 5px;
+  margin: 12px 0 14px; max-width: 940px;
+}
+.ov-day {
+  display: flex; align-items: baseline; gap: 9px;
+  padding: 7px 10px; border-radius: 8px;
+  background: var(--surface-2); text-align: left;
+  transition: background 0.18s var(--ease);
+}
+.ov-day:hover { background: var(--surface-3); }
+.ov-day-no {
+  flex-shrink: 0; padding: 2px 8px; border-radius: 6px;
+  font-size: 11.5px; font-weight: 700; color: #fff;
+}
+.ov-day-text { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
+
 /* ================================================================
    宽屏：时间轴 + 右侧粘性说明
    ================================================================ */
@@ -561,7 +609,20 @@ onMounted(load)
 .fold-head i { font-style: normal; color: var(--ink-4); font-size: 11px; transition: transform 0.24s var(--ease); }
 .fold-head i.up { transform: rotate(180deg); }
 
-.panel { margin-top: 12px; padding: 15px 16px; border-radius: var(--r-lg); }
+.panel {
+  margin-top: 12px; padding: 15px 16px; border-radius: var(--r-lg);
+  /* 折叠区内容可能很长（如「酒店建议」按天列出），限高 + 内部滚动。
+     不限的话右侧粘性栏会顶出视口底部，sticky 之后下半截再也够不着。 */
+  max-height: min(46vh, 440px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.panel::-webkit-scrollbar { width: 8px; }
+.panel::-webkit-scrollbar-thumb {
+  background: var(--line-2); border-radius: 4px;
+  border: 2px solid transparent; background-clip: content-box;
+}
+.panel::-webkit-scrollbar-thumb:hover { background: var(--ink-4); background-clip: content-box; }
 .panel-empty { margin: 0; font-size: 13px; color: var(--ink-3); }
 .panel-hint {
   margin: 0 0 10px; padding-bottom: 9px;
@@ -670,6 +731,12 @@ onMounted(load)
   .ov-sum { padding-left: 11px; margin-bottom: 11px; }
   .ov-sum p { font-size: 13px; line-height: 1.66; }
   .ov-meta { gap: 5px; }
+  .ov-days { margin: 10px 0 12px; gap: 4px; }
+  .ov-day { padding: 6px 9px; gap: 8px; }
+  .ov-day-text { font-size: 12px; }
+
+  /* 手机形态下说明区落在时间轴下方、不吸顶，不需要限高 */
+  .panel { max-height: none; overflow: visible; }
 
   .plan-layout { display: block; padding-bottom: 0; }
   .plan-days .sec-title { margin-top: 15px; }

@@ -333,8 +333,9 @@ class PlanBrief(BaseModel):
 class PlanPreview(BaseModel):
     """选景点时的紧凑度预估（纯硬编码，毫秒级，不调 LLM）。
 
-    load_ratio = (游览总时长 + 折算路程) ÷ 可用时间预算。
-    >1 表示装不下，会有景点被舍弃。
+    主指标是 `days_needed`（地理下限 = 片区簇 + 独占型各占一天）与用户设的天数之比；
+    `load_ratio` 仅作参考保留，**不再参与判定** —— 它对天数不敏感（分子分母同比例增长），
+    算不出「6 天只排了 4 天的量」这种情况。
     """
 
     city: str
@@ -350,6 +351,7 @@ class PlanPreview(BaseModel):
     load_ratio: float
 
     tightness: Literal["轻松", "适中", "紧凑", "超载"]
+    days_needed: int = Field(0, description="按地理下限推算的最少天数")
     per_day: list[dict] = Field(default_factory=list)
     will_drop: list[str] = Field(default_factory=list)
     suggestion: str = ""
