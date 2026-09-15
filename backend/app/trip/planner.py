@@ -261,6 +261,8 @@ def _is_standalone(city: Any, item: Any, transport: str) -> bool:
 # 命中规则后 build_day 会硬性拒绝，逼模型把景点挪到合适的位置——
 # 实测「在提示词里写一遍」是拦不住的，必须在工具层拦。
 
+# 时段硬知识的**权威来源是景点的 `best_time` 字段**（seed 时由 LLM 标注，换城市零改动）。
+# 下面这组关键词只是**兜底**：早期数据没有该字段时，仍按名称/标签猜一次。
 _MORNING_KEYS = ("熊猫", "动物园", "植物园", "繁育研究基地")
 _NIGHT_KEYS = ("洪崖洞", "不夜城", "九眼桥", "夜景", "夜游", "酒吧", "灯光秀", "兰桂坊")
 _MUSEUM_KEYS = ("博物馆", "博物院", "纪念馆", "美术馆")
@@ -274,15 +276,31 @@ class TimeRule:
     earliest_start: str  # 最早开始时间，"" 表示无限制
 
 
+# best_time 取值 → 具体约束。**改这一张表就能调整所有城市的时段规则。**
+_TIME_RULES: dict[str, TimeRule] = {
+    "morning": TimeRule("morning", "看动物要赶早，午后动物多在半睡", "12:00", ""),
+    "night": TimeRule("night", "夜景类要等亮灯后才有意义", "", "15:00"),
+    "museum": TimeRule("museum", "博物馆一般 17:00 闭馆", "15:30", ""),
+}
+
+
 def time_rule(item: Any) -> TimeRule | None:
-    """按景点名与标签判断时段约束。命中不了返回 None。"""
+    """判断景点的时段约束，命中不了返回 None。
+
+    优先读 `best_time` 字段（seed 时由 LLM 标注，**换城市零改动**）；
+    字段为空时回退到名称/标签关键词，兼容早期数据。
+    """
+    kind = str(getattr(item, "best_time", "") or "").strip().lower()
+    if kind in _TIME_RULES:
+        return _TIME_RULES[kind]
+
     text = f"{getattr(item, 'name', '') or ''} {' '.join(getattr(item, 'tags', None) or [])}"
     if any(k in text for k in _MORNING_KEYS):
-        return TimeRule("morning", "看动物要赶早，午后动物多在半睡", "12:00", "")
+        return _TIME_RULES["morning"]
     if any(k in text for k in _NIGHT_KEYS):
-        return TimeRule("night", "夜景类要等亮灯后才有意义", "", "15:00")
+        return _TIME_RULES["night"]
     if any(k in text for k in _MUSEUM_KEYS):
-        return TimeRule("museum", "博物馆一般 17:00 闭馆", "15:30", "")
+        return _TIME_RULES["museum"]
     return None
 
 
@@ -328,9 +346,14 @@ def _cost(city: Any, item: Any, transport: str) -> int:
     return int(item.visit_minutes + 2 * travel_from(city, item, transport))
 
 
+def _is_must(item: Any) -> bool:
+    """「必去」判定——与 materialize_day 里写 must_visit 的口径保持一致。"""
+    return bool(getattr(item, "must_visit", False)) or (getattr(item, "heat", 0) or 0) >= 90
+
+
 def _value(city: Any, item: Any, transport: str) -> float:
     """性价比：单位时间能换来多少「值得去」。必去景点给加成。"""
-    bonus = 30 if item.must_visit else 0
+    bonus = 30 if _is_must(item) else 0
     return (item.heat + bonus) / max(1, _cost(city, item, transport))
 
 
@@ -377,7 +400,11 @@ def prune_to_capacity(
         total = sum(_cost(city, a, req.transport) for a in kept)
         if total <= capacity:
             break
-        victim = min(kept, key=lambda a: _value(city, a, req.transport))
+        # 先丢普通景点；普通景点丢完了仍装不下，才轮到必去（must_visit 或热度 ≥90）。
+        # 早先只靠 _value 的 +30 加成做倾斜，实测抵不过远郊景点的高耗时——
+        # 成都「前 10 景 × 1 天」会把必去的大熊猫基地丢掉。
+        pool = [a for a in kept if not _is_must(a)] or kept
+        victim = min(pool, key=lambda a: _value(city, a, req.transport))
         kept.remove(victim)
         dropped.append(
             DroppedItem(

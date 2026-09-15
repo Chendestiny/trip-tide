@@ -15,6 +15,7 @@ from collections.abc import Iterator
 from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import create_engine, text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
@@ -79,13 +80,39 @@ def ensure_database() -> None:
         server_engine.dispose()
 
 
+# 项目没引 alembic，但给模型加字段是常事；这里做一次「轻量迁移」——只处理加列，
+# 幂等、零依赖，够用。删列 / 改类型仍需手工处理。
+_ADDED_COLUMNS: dict[str, dict[str, str]] = {
+    "trip_attraction": {
+        "best_time": "VARCHAR(12) NOT NULL DEFAULT ''",
+    },
+}
+
+
+def _ensure_columns() -> None:
+    """给已存在的表补上模型里新增的列（幂等）。"""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    with engine.begin() as conn:
+        for table, columns in _ADDED_COLUMNS.items():
+            if table not in tables:
+                continue
+            existing = {c["name"] for c in inspector.get_columns(table)}
+            for name, ddl in columns.items():
+                if name in existing:
+                    continue
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+                logger.info("轻量迁移：%s 补上列 %s", table, name)
+
+
 def init_db() -> None:
-    """建库 + 建表。可重复调用。"""
+    """建库 + 建表 + 轻量迁移。可重复调用。"""
     ensure_database()
     # 让 models 完成注册
     from app.trip import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _ensure_columns()
     logger.info("数据表已就绪：%s", ", ".join(sorted(Base.metadata.tables)))
 
 

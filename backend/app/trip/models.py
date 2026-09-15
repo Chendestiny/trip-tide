@@ -77,6 +77,12 @@ class Attraction(Base):
     visit_minutes: Mapped[int] = mapped_column(Integer, default=90, comment="建议游览时长(分钟)")
     heat: Mapped[int] = mapped_column(Integer, default=50, comment="热度 0-100")
     must_visit: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否城市必去")
+    best_time: Mapped[str] = mapped_column(
+        String(12),
+        default="",
+        server_default="",
+        comment="最佳时段：morning(早场) / night(夜景) / museum(闭馆早)；空=无约束",
+    )
     tags: Mapped[list] = mapped_column(JSON, default=list, comment='["历史","亲子"]')
     coord_source: Mapped[str] = mapped_column(
         String(16), default="seed", comment="坐标来源：amap / seed / manual"

@@ -295,6 +295,7 @@ class AttractionOut(BaseModel):
     visit_minutes: int = 90
     heat: int = 50
     must_visit: bool = False
+    best_time: str = Field("", description="最佳时段 morning/night/museum，空=无约束")
     tags: list[str] = Field(default_factory=list)
 
 

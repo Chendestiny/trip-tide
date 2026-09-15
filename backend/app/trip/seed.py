@@ -43,7 +43,7 @@ LIST_SYSTEM = """你是旅游数据编辑。只输出 JSON，不要任何解释�
 LIST_USER = """请为「{city}」列出 {n} 个最值得去的景点，按外地游客视角排序。
 
 输出 JSON（字段名必须完全一致）：
-{{"attractions":[{{"name":"景点官方常用名","district":"所在区，如 青羊区","intro":"一句话简介","visit_minutes":90,"heat":90,"must_visit":false,"tags":["历史"]}}]}}
+{{"attractions":[{{"name":"景点官方常用名","district":"所在区，如 青羊区","intro":"一句话简介","visit_minutes":90,"heat":90,"must_visit":false,"best_time":"","tags":["历史"]}}]}}
 
 要求：
 - name 必须是地图上能直接检索到的官方名称，不要用昵称（写「大熊猫繁育研究基地」而不是「熊猫基地」）
@@ -51,6 +51,11 @@ LIST_USER = """请为「{city}」列出 {n} 个最值得去的景点，按外地
 - visit_minutes 是建议游览分钟数，含进出场时间，取 45 的倍数，范围 45~300
 - heat 为 0~100 整数，代表外地游客热度，要拉开档次不要都给 90
 - must_visit 只给最核心的 4~6 个标 true
+- best_time 用来约束「该上午去还是晚上去」，四选一，拿不准就留空字符串：
+  · "morning" 看动物 / 自然类，午后状态差（动物园、熊猫基地、植物园）
+  · "night"   夜景 / 夜游 / 酒吧街，要等亮灯（江边夜景、不夜城、灯光秀）
+  · "museum"  博物馆 / 美术馆 / 纪念馆，闭馆早
+  · ""        没有时段要求（绝大多数景点都是这个）
 - 类型要混合：地标 / 历史古迹 / 博物馆 / 自然公园 / 商圈文创 / 美食街区，
   其中近郊景点（车程 1 小时以上）最多 3 个
 只输出 JSON。"""
@@ -157,6 +162,12 @@ def upsert_attractions(
         row.visit_minutes = int(item.get("visit_minutes") or row.visit_minutes or 90)
         row.heat = int(item.get("heat") or row.heat or 50)
         row.must_visit = bool(item.get("must_visit", row.must_visit))
+        # 时段约束：morning / night / museum / 空 —— planner.time_rule() 优先读它，
+        # 换城市不用改代码；早期数据留空时仍回退到名称关键词
+        best_time = str(item.get("best_time") or "").strip().lower()
+        if best_time not in ("morning", "night", "museum"):
+            best_time = ""
+        row.best_time = best_time or row.best_time or ""
         row.tags = list(item.get("tags") or row.tags or [])
         row.coord_source = coord_source
         written += 1

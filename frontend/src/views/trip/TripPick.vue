@@ -349,17 +349,23 @@ async function load() {
 
 // ---------- 紧凑度预估：防抖 350ms，纯硬编码接口，毫秒级返回 ----------
 let previewTimer = null
+let previewSeq = 0   // 请求序号：只认最新一次的响应，否则改了天数/节奏后
+                     // 旧请求后返回会把新结果盖掉（表现为「排 6 天」却按 7 天算）
+
 function refreshPreview() {
   clearTimeout(previewTimer)
   if (!selectedIds.value.length) {
     preview.value = null
     return
   }
+  const seq = ++previewSeq
   previewTimer = setTimeout(async () => {
     try {
-      preview.value = await previewPlan(buildPayload())
+      const data = await previewPlan(buildPayload())
+      if (seq !== previewSeq) return // 已有更新的请求在跑，丢弃这次结果
+      preview.value = data
     } catch {
-      preview.value = null // 预估失败不影响主流程
+      if (seq === previewSeq) preview.value = null // 预估失败不影响主流程
     }
   }, 350)
 }
