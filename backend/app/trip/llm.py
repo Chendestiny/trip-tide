@@ -282,7 +282,7 @@ def run_pipeline(
     # ---------- 阶段 ①：硬编码分天（瞬时、确定） ----------
     per_day_budget = min(planner.day_budget(req, i, days) for i in range(1, days + 1))
     kept, dropped = planner.prune_to_capacity(city, attractions, req, per_day_budget)
-    groups = planner.assign_days(city, kept, days, req.transport)
+    groups = planner.assign_days(city, kept, days, req.transport, req.pace)
     hotels = planner.plan_hotels(city, groups)
     trace.append(f"plan_days days={days} kept={len(kept)} dropped={len(dropped)}")
 

@@ -178,7 +178,7 @@ def _tool_plan_days(s: PlanSession, args: dict) -> dict:
     )
 
     kept, over = planner.prune_to_capacity(s.city, picked, req, budget)
-    groups = planner.assign_days(s.city, kept, days, transport)
+    groups = planner.assign_days(s.city, kept, days, transport, req.pace)
 
     out_days = []
     for idx, items in enumerate(groups, start=1):

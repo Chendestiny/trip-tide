@@ -105,7 +105,7 @@ def preview_plan(db: Session, req: PlanRequest) -> PlanPreview:
     per_day_budget = min(planner.day_budget(req, i, days) for i in range(1, days + 1))
     capacity = per_day_budget * days
     kept, will_drop = planner.prune_to_capacity(city, attractions, req, per_day_budget)
-    groups = planner.assign_days(city, kept, days, req.transport)
+    groups = planner.assign_days(city, kept, days, req.transport, req.pace)
 
     visit_total = 0
     travel_total = 0

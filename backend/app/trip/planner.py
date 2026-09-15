@@ -83,8 +83,32 @@ STANDALONE_TRAVEL_MIN = 45  # 单程 ≥45min → 独占一天
 CAPACITY_SLACK = 1.10       # 容量裁剪的松弛系数（路程有共享，但不能按 0 计）
 OVERRUN_TOLERANCE = 30      # 超过目标返回时间多少分钟算「远郊日跑长了」
 OVERNIGHT_KM = 45.0         # 当天景点离常住片区超过这个距离 → 建议就近过夜
-# 倾向系数：宽松少塞、紧凑多塞
+# 倾向系数：宽松少塞、紧凑多塞（用于容量裁剪的松弛）
 PACE_FACTOR = {"relaxed": 0.82, "balanced": 1.0, "packed": 1.15}
+
+# ================================================================ 分天模型 v2
+# 分天的第一原则是「地理距离」，其次是景点重要性。为此先把景点量化成两件事：
+#   · 级别（小/中/大）—— 由基础游览时长推导，决定「一天能放几个」
+#   · 是否远郊      —— 单程 ≥45min，额外吃掉两倍单程时间，与级别是两个独立维度
+# 再按通行时间把地理紧邻的景点聚成「片区簇」，簇在分天时是**原子、不可拆**。
+
+GRADE_SMALL_MAX = 90        # ≤90 分钟        → 小景点（顺路打卡）
+GRADE_MEDIUM_MAX = 180      # 91~180 分钟     → 中景点（半天量）；>180 → 大景点（占一天）
+
+# 每天目标「游玩时长」（分钟）：决定一天排几个，与用户确认过
+PACE_TARGET_MINUTES = {"relaxed": 240, "balanced": 360, "packed": 450}
+
+# 弹性填充：(填充率 r, 倍数上限 m)
+#     最终游玩 = clamp(可用游玩 × r, 基础游玩, 基础游玩 × m)
+PACE_FLEX = {
+    "relaxed": (0.80, 1.00),    # 按最少，早点收工
+    "balanced": (0.95, 1.25),   # 适当扩充
+    "packed": (1.00, 1.50),     # 填满可用时间
+}
+BIG_FLEX_MAX = 1.50         # 大景点 / 远郊不受节奏限制，一律允许扩到 1.5
+
+CLUSTER_MAX_METERS = 1200   # 直线 ≤1.2km → 同一片区簇（步行约 15 分钟，簇内不拆）
+MIN_SPLIT_MINUTES = 30      # 大景点跨午饭拆分时，前后每段至少这么长才值得拆
 
 
 # ================================================================ 地理工具
@@ -368,54 +392,209 @@ def _nn_chain(items: Sequence[Any], start: Any) -> list[Any]:
     return chain
 
 
-def _split_balanced(chain: Sequence[Any], days: int) -> list[list[Any]]:
-    """把一条链按「游览总时长尽量均分」切成 days 段，且保持链上连续。"""
-    n = len(chain)
-    if n == 0:
-        return [[] for _ in range(days)]
-    if days >= n:
-        groups = [[a] for a in chain]
-        groups.extend([] for _ in range(days - n))
-        return groups[:days]
+# ---------------------------------------------------------------- 分级与地理聚类
+def grade_attraction(item: Any) -> str:
+    """按基础游览时长给景点分级：小 / 中 / 大。
 
+    级别决定「一天能放几个」——小景点可顺路带两个，大景点自己占一天。
+    只依赖 visit_minutes，所以换城市零成本。
+    """
+    minutes = getattr(item, "visit_minutes", 90) or 90
+    if minutes <= GRADE_SMALL_MAX:
+        return "小"
+    if minutes <= GRADE_MEDIUM_MAX:
+        return "中"
+    return "大"
+
+
+def is_remote(city: Any, item: Any, transport: str) -> bool:
+    """远郊：单程通行 ≥45 分钟。与级别是两个独立维度。"""
+    return travel_from(city, item, transport) >= STANDALONE_TRAVEL_MIN
+
+
+def travel_minutes(city: Any, a: Any, b: Any, transport: str) -> int:
+    """两景点之间的通行分钟数——分天矩阵的最小单元。"""
+    return leg(city, a.lat, a.lng, b.lat, b.lng, transport).minutes
+
+
+def travel_matrix(
+    city: Any, attractions: Sequence[Any], transport: str
+) -> dict[tuple[int, int], int]:
+    """景点两两通行时间矩阵，键为 (小 id, 大 id)。
+
+    默认用 leg() 的分档速度估算；「直线 1.5~8km」的模糊对可由 amap.route_minutes()
+    用真实路网覆盖（见 amap.py 的节制策略）。
+    """
+    out: dict[tuple[int, int], int] = {}
+    items = list(attractions)
+    for i, a in enumerate(items):
+        for b in items[i + 1:]:
+            lo, hi = (a, b) if a.id < b.id else (b, a)
+            out[(lo.id, hi.id)] = travel_minutes(city, lo, hi, transport)
+    return out
+
+
+def cluster_attractions(
+    city: Any,
+    attractions: Sequence[Any],
+    transport: str,
+    threshold_m: float = CLUSTER_MAX_METERS,
+) -> list[list[Any]]:
+    """按**直线距离**把景点聚成「片区簇」——步行可达的归为一簇。
+
+    先最近邻成链（保证地理顺路），再在「相邻直线距离 > threshold_m」处断开。
+    用直线距离而不是通行时间，是为了避开速度模型的两个噪音：
+    「1.5km 内一律步行」和「耗时取整到 5 分钟」——它们会让 0.6km 与 1.4km
+    都算步行、耗时却差三倍，导致阈值判断在 8~15 分钟之间出现悬崖。
+
+    **簇是分天的原子单位，簇内景点不会被拆到不同天** —— 所以像
+    锦里古街↔武侯祠（实测 0.24km、步行 5 分钟）这种组合必然落在同一天。
+    """
+    items = list(attractions)
+    if not items:
+        return []
+    if len(items) == 1:
+        return [items]
+
+    anchor = max(items, key=lambda a: (a.heat, a.visit_minutes))
+    chain = _nn_chain(items, anchor)
+
+    clusters: list[list[Any]] = [[chain[0]]]
+    for prev, item in zip(chain, chain[1:]):
+        if haversine_m(prev.lat, prev.lng, item.lat, item.lng) <= threshold_m:
+            clusters[-1].append(item)
+        else:
+            clusters.append([item])
+    return clusters
+
+
+def _split_cluster(
+    city: Any,
+    group: Sequence[Any],
+    transport: str,
+    threshold_m: float = CLUSTER_MAX_METERS,
+) -> tuple[list[Any], list[Any]] | None:
+    """把簇切成两半：两侧游览时长尽量接近，但**绝不在紧邻对处切**。
+
+    切点必须落在「相邻直线距离 > threshold_m」的真断点上；若整个簇在阈值内
+    串成一片，返回 None 表示它是一个地理整体、不该拆。
+    """
+    if len(group) < 2:
+        return None
+    chain = _nn_chain(group, max(group, key=lambda a: (a.heat, a.visit_minutes)))
     total = sum(a.visit_minutes for a in chain)
-    target = total / days
-    groups: list[list[Any]] = []
-    cur: list[Any] = []
+
+    best_cut, best_score = None, None
     acc = 0
-    remaining_days = days
+    for k in range(1, len(chain)):
+        acc += chain[k - 1].visit_minutes
+        gap_m = haversine_m(
+            chain[k - 1].lat, chain[k - 1].lng, chain[k].lat, chain[k].lng
+        )
+        if gap_m <= threshold_m:
+            continue                       # 紧邻对，不许切
+        score = abs(acc - (total - acc))   # 两边时长越接近越好
+        if best_score is None or score < best_score:
+            best_cut, best_score = k, score
+    if best_cut is None:
+        return None
+    return chain[:best_cut], chain[best_cut:]
 
-    for idx, item in enumerate(chain):
-        cur.append(item)
-        acc += item.visit_minutes
-        left_items = n - idx - 1
-        left_days = remaining_days - 1
-        # 剩余景点数不够铺满剩余天数时，必须立刻收口
-        must_cut = left_items <= left_days
-        if remaining_days > 1 and (acc >= target or must_cut):
-            groups.append(cur)
-            cur, acc = [], 0
-            remaining_days -= 1
 
-    if cur:
-        groups.append(cur)
+def _group_load(city: Any, group: Sequence[Any], transport: str) -> int:
+    """一组景点排成一天要占用多少分钟 = **游览 + 路程**（含从市中心往返）。
+
+    只算游览会严重低估：远郊景点游览 1 小时、往返却要 3 小时。
+    顺序按传入顺序——分配阶段用的是最近邻链序，本身已经地理顺路。
+    """
+    items = list(group)
+    if not items:
+        return 0
+    visit = sum(a.visit_minutes for a in items)
+    travel = 0
+    lat, lng = city.center_lat, city.center_lng
+    for a in items:
+        travel += leg(city, lat, lng, a.lat, a.lng, transport).minutes
+        lat, lng = a.lat, a.lng
+    travel += leg(city, lat, lng, city.center_lat, city.center_lng, transport).minutes
+    return visit + travel
+
+
+def _alloc_clusters_to_days(
+    city: Any,
+    clusters: Sequence[Sequence[Any]],
+    days: int,
+    transport: str,
+    target_minutes: int,
+) -> list[list[Any]]:
+    """把片区簇分配到 days 天。簇是原子——只有必要时才合并或拆分。
+
+    一天的「量」= 游览 + 路程（见 `_group_load`），不是只看游览时长。
+
+    簇太多 → 合并「地理最近」的两簇（优先合并不超目标时长的）。
+    簇太少 → 只拆「内部有 >CLUSTER_MAX_METERS 断点」的簇；全都紧凑时
+             **宁可让某些天空着**，也不违反「地理优先」把紧邻景点拆开 ——
+             紧凑度会据此提示「天数偏多」。
+    """
+    groups = [list(c) for c in clusters if c]
+    if not groups:
+        return [[] for _ in range(days)]
+
+    def size(g: Sequence[Any]) -> int:
+        return _group_load(city, g, transport)
+
+    while len(groups) > days:
+        best_i, best_score = 0, None
+        for i in range(len(groups) - 1):
+            a, b = groups[i], groups[i + 1]
+            gap = min(haversine_m(x.lat, x.lng, y.lat, y.lng) for x in a for y in b)
+            over = max(0, size(a) + size(b) - target_minutes)
+            score = (over, gap)
+            if best_score is None or score < best_score:
+                best_i, best_score = i, score
+        groups[best_i] = groups[best_i] + groups[best_i + 1]
+        del groups[best_i + 1]
+
+    while len(groups) < days:
+        cands = []
+        for i, g in enumerate(groups):
+            split = _split_cluster(city, g, transport)
+            if split:
+                cands.append((sum(a.visit_minutes for a in g), i, split))
+        if not cands:
+            break
+        _, i, (left, right) = max(cands, key=lambda x: x[0])   # 优先拆时长最大的
+        groups[i:i + 1] = [left, right]
+
     groups.extend([] for _ in range(days - len(groups)))
     return groups[:days]
 
 
 def assign_days(
-    city: Any, attractions: Sequence[Any], days: int, transport: str
+    city: Any,
+    attractions: Sequence[Any],
+    days: int,
+    transport: str,
+    pace: str = "balanced",
 ) -> list[list[Any]]:
-    """把景点分配到每一天。
+    """把景点分配到每一天。**地理优先**：片区簇是骨架，簇内不可拆。
 
-    独占型（远郊 / 超长游览）先各自占一天，剩下的市区景点再成链均分。
-    不这么做的话，最近邻链会把远郊景点排在链尾，和市区景点凑成一天，两头都装不下。
+    规则（顺序不能换）：
+      ① 大景点 / 远郊 → 独占一天（它们本身就装不下别的）
+      ② 其余按通行时间聚成片区簇
+      ③ 簇分配到天：簇太多就合并，太少只在「真断点」处拆
+      ④ 天与天按地理顺路排序，减少跨天折返
+      ⑤ 每天内部应用时段硬规则（早场打头、夜景压尾）
+
+    这样像锦里古街↔武侯祠（步行 5 分钟）这类紧邻景点必然落在同一天，
+    不会再出现「按游览时长均分、恰好把它俩切开」的问题。
     """
     if not attractions:
         return [[] for _ in range(days)]
 
     standalone = [a for a in attractions if _is_standalone(city, a, transport)]
-    normal = [a for a in attractions if not _is_standalone(city, a, transport)]
+    standalone_ids = {a.id for a in standalone}
+    normal = [a for a in attractions if a.id not in standalone_ids]
 
     standalone.sort(key=lambda a: (-a.heat, -a.visit_minutes))
     if len(standalone) > days:
@@ -428,9 +607,11 @@ def assign_days(
 
     if normal:
         if left_days > 0:
-            anchor = max(normal, key=lambda a: (a.heat, a.visit_minutes))
-            chain = _nn_chain(normal, anchor)
-            groups.extend(_split_balanced(chain, left_days))
+            clusters = cluster_attractions(city, normal, transport)
+            target = PACE_TARGET_MINUTES.get(pace, PACE_TARGET_MINUTES["balanced"])
+            groups.extend(
+                _alloc_clusters_to_days(city, clusters, left_days, transport, target)
+            )
         else:
             # 没位置了，塞进最后一个独占日，随后由逐天裁剪决定去留
             groups[-1].extend(normal)
@@ -622,6 +803,47 @@ def _make_theme(city_name: str, items: Sequence[Any]) -> str:
     return f"{prefix}｜{' → '.join(names[:3])}"[:80]
 
 
+def _estimate_travel(
+    city: Any,
+    items: Sequence[Any],
+    origin_lat: float,
+    origin_lng: float,
+    transport: str,
+) -> int:
+    """按给定顺序预估当天赶路总时长（含最后一站回住宿片区）。"""
+    total = 0
+    lat, lng = origin_lat, origin_lng
+    for a in items:
+        total += leg(city, lat, lng, a.lat, a.lng, transport).minutes
+        lat, lng = a.lat, a.lng
+    total += leg(city, lat, lng, origin_lat, origin_lng, transport).minutes
+    return total
+
+
+def _flex_scale(
+    city: Any, items: Sequence[Any], req: PlanRequest, base_total: int, available: int
+) -> float:
+    """当天游玩时长的放大倍数——**弹性填充**。
+
+    景点排得少的日子，余量不该浪费成一个假的「自由活动」节点，而应还给景点本身：
+
+        最终游玩 = clamp(可用游玩 × r, 基础游玩, 基础游玩 × m)
+
+    r / m 按节奏取（轻松按最少、平衡适当、紧凑填满）；**大景点与远郊不受节奏限制**
+    —— 都江堰玩一整天很正常，不该因为选了「轻松」就只逛 4 小时。
+    """
+    if base_total <= 0 or available <= 0:
+        return 1.0
+    ratio, cap = PACE_FLEX.get(req.pace, PACE_FLEX["balanced"])
+    if any(
+        a.visit_minutes > GRADE_MEDIUM_MAX
+        or travel_from(city, a, req.transport) >= STANDALONE_TRAVEL_MIN
+        for a in items
+    ):
+        cap = max(cap, BIG_FLEX_MAX)
+    return max(1.0, min(available * ratio / base_total, cap))
+
+
 def materialize_day(
     city: Any,
     day_index: int,
@@ -697,6 +919,38 @@ def materialize_day(
             )
         )
 
+    def push_attr(
+        at: int,
+        item: Any,
+        stay: int,
+        travel: int,
+        mode: str,
+        moved: dict | None,
+        resumed: bool = False,
+    ) -> None:
+        """压入一个景点节点。
+
+        大景点跨越午饭窗口时会压两个（上午段 + 下午段），
+        这样午饭仍然落在正常饭点，而不是被拖到 15:00 之后。
+        """
+        push(
+            TimelineNode(
+                time=fmt_hhmm(at),
+                type="attraction",
+                name=f"{item.name}（下午继续）" if resumed else item.name,
+                attraction_id=item.id,
+                # 优先用大纲给的建议（模型写的更具体：哪个门进、几点人少、要不要预约）
+                advice=advice.get(item.id) or item.intro or "建议留足时间慢慢逛。",
+                stay_minutes=stay,
+                travel_minutes=travel,
+                travel_mode="步行" if resumed else mode,
+                must_visit=bool(item.must_visit) or item.heat >= 90,
+                moved_to_day=day_index if moved else None,
+                moved_from_day=moved["from_day"] if moved else None,
+                move_reason=moved["reason"] if moved else "",
+            )
+        )
+
     push(
         TimelineNode(
             time=fmt_hhmm(start_min),
@@ -711,6 +965,17 @@ def materialize_day(
         )
     )
 
+    # ---------- 弹性游玩时长 ----------
+    base_total = sum(a.visit_minutes for a in items)
+    travel_est = _estimate_travel(city, items, origin_lat, origin_lng, req.transport)
+    window = return_min - start_min
+    available = window - (MEAL_LUNCH_MINUTES + MEAL_DINNER_MINUTES) - travel_est
+    scale = _flex_scale(city, items, req, base_total, available)
+
+    def stretch(item: Any) -> int:
+        """按当天余量放大后的游览时长，对齐到 5 分钟。"""
+        return max(5, int(round(item.visit_minutes * scale / 5.0) * 5))
+
     lunch_done = False
     for item in items:
         go = leg(city, cur_lat, cur_lng, item.lat, item.lng, req.transport)
@@ -721,7 +986,7 @@ def materialize_day(
         # 但等待超过 75 分钟就不值得等（比如 09:00 就到华山脚下），那种情况改为下来后再吃。
         if not lunch_done:
             wait = max(0, parse_hhmm(LUNCH_FROM) - arrive)
-            if arrive + item.visit_minutes > parse_hhmm("14:00") and wait <= LUNCH_MAX_WAIT:
+            if arrive + stretch(item) > parse_hhmm("14:00") and wait <= LUNCH_MAX_WAIT:
                 # 不传 gap：让它按「lunch_at - cur_time」反推，
                 # 这样「路程 80 分 + 等到 11:20 的 60 分」都算进去，时间轴依然自洽
                 add_meal("lunch", max(arrive, parse_hhmm(LUNCH_FROM)), item.district)
@@ -730,23 +995,33 @@ def materialize_day(
                 arrive = cur_time + travel
 
         moved = moved_from.get(item.id)
-        push(
-            TimelineNode(
-                time=fmt_hhmm(arrive),
-                type="attraction",
-                name=item.name,
-                attraction_id=item.id,
-                # 优先用大纲给的建议（模型写的更具体：哪个门进、几点人少、要不要预约）
-                advice=advice.get(item.id) or item.intro or "建议留足时间慢慢逛。",
-                stay_minutes=item.visit_minutes,
-                travel_minutes=travel,
-                travel_mode=go.label,
-                must_visit=bool(item.must_visit) or item.heat >= 90,
-                moved_to_day=day_index if moved else None,
-                moved_from_day=moved["from_day"] if moved else None,
-                move_reason=moved["reason"] if moved else "",
+        stay = stretch(item)
+        lunch_at = parse_hhmm(LUNCH_FROM)
+
+        # 弹性拉长后，大景点的游玩会跨过午饭窗口（如 09:15 → 15:15）。
+        # 这时把午饭插在**景点中途**（上午段 → 午餐 → 下午段），而不是「玩完再吃」，
+        # 否则午餐会被拖到 15:00 之后，时间轴上多出一段莫名其妙的长游览。
+        morning = lunch_at - arrive
+        afternoon = stay - morning
+        if (
+            not lunch_done
+            and arrive < lunch_at < arrive + stay
+            and morning >= MIN_SPLIT_MINUTES
+            and afternoon >= MIN_SPLIT_MINUTES
+        ):
+            back_to_spot = 5      # 从餐厅走回景区只需要步行
+            push_attr(arrive, item, morning, travel, go.label, moved)
+            cur_lat, cur_lng = item.lat, item.lng
+            add_meal("lunch", lunch_at, item.district, gap=0)
+            lunch_done = True
+            push_attr(
+                cur_time + back_to_spot, item, afternoon, back_to_spot,
+                go.label, moved, resumed=True,
             )
-        )
+            cur_lat, cur_lng = item.lat, item.lng
+            continue
+
+        push_attr(arrive, item, stay, travel, go.label, moved)
         cur_lat, cur_lng = item.lat, item.lng
 
         # 这个景点跨过了午饭点 → 出来立刻吃，别拖到下一站
@@ -801,8 +1076,12 @@ def materialize_day(
         )
     )
 
-    # 丰富度：按「活动总时长」判定
-    active = sum(n.stay_minutes for n in nodes) + sum(n.travel_minutes for n in nodes)
+    # 丰富度：只看「真实活动」——景点停留 + 全部赶路。
+    # 必须排除留白节点（type=transit 的「自由活动」），否则一天只玩 1 小时
+    # 也会被留白时长撑成「紧凑」，完全反直觉。
+    active = sum(n.stay_minutes for n in nodes if n.type != "transit") + sum(
+        n.travel_minutes for n in nodes
+    )
     if active <= 300:
         pace = "轻松"
     elif active <= 450:
@@ -890,7 +1169,7 @@ def plan_fallback(city: Any, attractions: Sequence[Any], req: PlanRequest) -> Pl
     # ① 容量裁剪
     kept, dropped = prune_to_capacity(city, attractions, req, per_day_budget)
     # ②③ 独占型隔离 + 成链均分
-    groups = assign_days(city, kept, days, req.transport)
+    groups = assign_days(city, kept, days, req.transport, req.pace)
     # 住宿：一次定全程，只有远郊日才换
     hotels = plan_hotels(city, groups)
 
