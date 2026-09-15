@@ -1,0 +1,18 @@
+{
+  "name": "triptide",
+  "private": true,
+  "version": "0.0.1",
+  "description": "TripTide — AI 行程规划（Vue 3 + FastAPI + MySQL，根目录开发编排）",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "concurrently -n fe,be -c cyan,green \"npm:dev:frontend\" \"npm:dev:backend\"",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "cd backend && venv\\Scripts\\python -m uvicorn app.main:app --reload --port 8002",
+    "seed": "cd backend && venv\\Scripts\\python -m app.trip.seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

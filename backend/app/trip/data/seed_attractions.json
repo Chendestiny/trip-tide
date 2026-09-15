@@ -1,0 +1,2519 @@
+{
+  "meta": {
+    "note": "离线种子数据。无 AMAP_KEY 时直接入库使用；有 AMAP_KEY 时坐标会被高德 POI 搜索结果覆盖校准。",
+    "coord_system": "GCJ-02",
+    "generated_for": "TripTide V1"
+  },
+  "cities": [
+    {
+      "name": "成都",
+      "pinyin": "chengdu",
+      "emoji": "🐼",
+      "tagline": "巴适慢生活 · 熊猫与麻辣",
+      "heat": 98,
+      "center_lat": 30.657,
+      "center_lng": 104.0657,
+      "hotel_areas": [
+        {
+          "area": "春熙路/太古里",
+          "lat": 30.655,
+          "lng": 104.081,
+          "pros": "地铁2/3号线交汇，去东郊记忆、九眼桥都顺，夜里还能逛。",
+          "cons": "价格偏高，临街房偏吵。"
+        },
+        {
+          "area": "宽窄巷子/人民公园",
+          "lat": 30.663,
+          "lng": 104.057,
+          "pros": "老城核心，步行可达宽窄巷子、人民公园、天府广场，最有成都味。",
+          "cons": "去东郊和南边高新区需要坐车。"
+        },
+        {
+          "area": "天府广场/骡马市",
+          "lat": 30.66,
+          "lng": 104.068,
+          "pros": "地铁1/2号线换乘，去哪个方向都居中。",
+          "cons": "夜间氛围一般，需要坐车去热闹处。"
+        },
+        {
+          "area": "都江堰市区/南桥",
+          "lat": 30.99,
+          "lng": 103.618,
+          "pros": "都江堰与青城山两个远郊日的就近据点，省掉每天 2 小时往返车程。",
+          "cons": "离成都市区 60 km，只适合连着排远郊日时用，回市区要重新搬一次行李。"
+        }
+      ],
+      "attractions": [
+        {
+          "name": "宽窄巷子",
+          "district": "青羊区",
+          "lat": 30.669,
+          "lng": 104.0558,
+          "visit_minutes": 90,
+          "heat": 95,
+          "must_visit": true,
+          "intro": "清代古街巷，老成都院落、掏耳朵与盖碗茶的集合地。",
+          "tags": [
+            "历史",
+            "街拍",
+            "小吃"
+          ]
+        },
+        {
+          "name": "大熊猫繁育研究基地",
+          "district": "成华区",
+          "lat": 30.738,
+          "lng": 104.1469,
+          "visit_minutes": 180,
+          "heat": 98,
+          "must_visit": true,
+          "intro": "看熊猫要趁早，7:30 开园时熊猫最活跃。",
+          "tags": [
+            "亲子",
+            "必去"
+          ]
+        },
+        {
+          "name": "武侯祠",
+          "district": "武侯区",
+          "lat": 30.6478,
+          "lng": 104.047,
+          "visit_minutes": 90,
+          "heat": 90,
+          "must_visit": true,
+          "intro": "全国影响最大的三国遗迹博物馆，与锦里一墙之隔。",
+          "tags": [
+            "历史"
+          ]
+        },
+        {
+          "name": "锦里古街",
+          "district": "武侯区",
+          "lat": 30.6461,
+          "lng": 104.0455,
+          "visit_minutes": 90,
+          "heat": 92,
+          "must_visit": false,
+          "intro": "紧邻武侯祠的仿古商业街，夜景灯笼比白天好看。",
+          "tags": [
+            "小吃",
+            "夜景"
+          ]
+        },
+        {
+          "name": "杜甫草堂",
+          "district": "青羊区",
+          "lat": 30.6656,
+          "lng": 104.0286,
+          "visit_minutes": 90,
+          "heat": 85,
+          "must_visit": false,
+          "intro": "杜甫寓居成都的故居，园林清幽适合慢走。",
+          "tags": [
+            "园林",
+            "历史"
+          ]
+        },
+        {
+          "name": "青羊宫",
+          "district": "青羊区",
+          "lat": 30.6644,
+          "lng": 104.0394,
+          "visit_minutes": 60,
+          "heat": 78,
+          "must_visit": false,
+          "intro": "成都现存最古老的道观，与杜甫草堂步行可达。",
+          "tags": [
+            "宗教",
+            "历史"
+          ]
+        },
+        {
+          "name": "人民公园",
+          "district": "青羊区",
+          "lat": 30.659,
+          "lng": 104.0582,
+          "visit_minutes": 60,
+          "heat": 80,
+          "must_visit": false,
+          "intro": "鹤鸣茶社喝一碗盖碗茶，看成都人怎么消磨下午。",
+          "tags": [
+            "市井",
+            "茶馆"
+          ]
+        },
+        {
+          "name": "春熙路",
+          "district": "锦江区",
+          "lat": 30.6577,
+          "lng": 104.081,
+          "visit_minutes": 90,
+          "heat": 88,
+          "must_visit": false,
+          "intro": "成都最热闹的商圈，IFS 熊猫爬楼打卡点在这。",
+          "tags": [
+            "购物",
+            "街拍"
+          ]
+        },
+        {
+          "name": "太古里",
+          "district": "锦江区",
+          "lat": 30.6543,
+          "lng": 104.0802,
+          "visit_minutes": 120,
+          "heat": 90,
+          "must_visit": false,
+          "intro": "大慈寺旁的低密度街区，品牌店与咖啡都集中在这。",
+          "tags": [
+            "购物",
+            "咖啡"
+          ]
+        },
+        {
+          "name": "九眼桥",
+          "district": "锦江区",
+          "lat": 30.643,
+          "lng": 104.092,
+          "visit_minutes": 90,
+          "heat": 82,
+          "must_visit": false,
+          "intro": "酒吧街沿锦江排开，晚上来才有意思。",
+          "tags": [
+            "夜生活"
+          ]
+        },
+        {
+          "name": "四川博物院",
+          "district": "青羊区",
+          "lat": 30.6695,
+          "lng": 104.021,
+          "visit_minutes": 120,
+          "heat": 75,
+          "must_visit": false,
+          "intro": "免费但需预约，张大千书画馆是看点。",
+          "tags": [
+            "博物馆"
+          ]
+        },
+        {
+          "name": "金沙遗址博物馆",
+          "district": "青羊区",
+          "lat": 30.682,
+          "lng": 104.012,
+          "visit_minutes": 120,
+          "heat": 84,
+          "must_visit": false,
+          "intro": "太阳神鸟出土地，遗址馆原地保留发掘现场。",
+          "tags": [
+            "博物馆",
+            "历史"
+          ]
+        },
+        {
+          "name": "东郊记忆",
+          "district": "成华区",
+          "lat": 30.664,
+          "lng": 104.124,
+          "visit_minutes": 120,
+          "heat": 80,
+          "must_visit": false,
+          "intro": "老厂房改造的文创园，适合傍晚拍照。",
+          "tags": [
+            "文创",
+            "街拍"
+          ]
+        },
+        {
+          "name": "文殊院",
+          "district": "青羊区",
+          "lat": 30.674,
+          "lng": 104.071,
+          "visit_minutes": 60,
+          "heat": 83,
+          "must_visit": false,
+          "intro": "闹市中的千年古刹，隔壁的素斋和洞子口凉粉值得一试。",
+          "tags": [
+            "宗教",
+            "小吃"
+          ]
+        },
+        {
+          "name": "望江楼公园",
+          "district": "武侯区",
+          "lat": 30.635,
+          "lng": 104.092,
+          "visit_minutes": 60,
+          "heat": 70,
+          "must_visit": false,
+          "intro": "薛涛纪念地，竹种最多的公园，人少清静。",
+          "tags": [
+            "园林"
+          ]
+        },
+        {
+          "name": "都江堰",
+          "district": "都江堰市",
+          "lat": 30.995,
+          "lng": 103.61,
+          "visit_minutes": 240,
+          "heat": 93,
+          "must_visit": false,
+          "intro": "两千年仍在用的水利工程，从南桥进景区最顺。",
+          "tags": [
+            "世界遗产",
+            "近郊"
+          ]
+        },
+        {
+          "name": "青城山",
+          "district": "都江堰市",
+          "lat": 30.902,
+          "lng": 103.57,
+          "visit_minutes": 300,
+          "heat": 91,
+          "must_visit": false,
+          "intro": "道教发源名山，前山道观密集，后山偏徒步。",
+          "tags": [
+            "登山",
+            "世界遗产"
+          ]
+        },
+        {
+          "name": "环球中心",
+          "district": "高新区",
+          "lat": 30.573,
+          "lng": 104.062,
+          "visit_minutes": 120,
+          "heat": 72,
+          "must_visit": false,
+          "intro": "巨型商业综合体，内含室内海洋乐园，雨天备选。",
+          "tags": [
+            "购物",
+            "亲子"
+          ]
+        },
+        {
+          "name": "天府广场",
+          "district": "青羊区",
+          "lat": 30.657,
+          "lng": 104.0657,
+          "visit_minutes": 45,
+          "heat": 70,
+          "must_visit": false,
+          "intro": "城市几何中心，地铁1/2号线换乘，路过打个卡即可。",
+          "tags": [
+            "地标"
+          ]
+        },
+        {
+          "name": "成都博物馆",
+          "district": "青羊区",
+          "lat": 30.66,
+          "lng": 104.065,
+          "visit_minutes": 120,
+          "heat": 79,
+          "must_visit": false,
+          "intro": "天府广场旁，免费预约，皮影与民俗展做得好。",
+          "tags": [
+            "博物馆"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "北京",
+      "pinyin": "beijing",
+      "emoji": "🏯",
+      "tagline": "中轴线上的千年帝都",
+      "heat": 97,
+      "center_lat": 39.9042,
+      "center_lng": 116.4074,
+      "hotel_areas": [
+        {
+          "area": "王府井/东单",
+          "lat": 39.915,
+          "lng": 116.411,
+          "pros": "地铁1/5号线交汇，去故宫、天安门步行可达，吃喝方便。",
+          "cons": "价格贵，老楼多。"
+        },
+        {
+          "area": "前门/大栅栏",
+          "lat": 39.899,
+          "lng": 116.398,
+          "pros": "紧贴中轴线南端，逛天安门—故宫—天坛一条线最顺。",
+          "cons": "胡同院落房隔音一般。"
+        },
+        {
+          "area": "三里屯",
+          "lat": 39.933,
+          "lng": 116.455,
+          "pros": "夜生活与餐饮最强，去798、鸟巢都近。",
+          "cons": "离故宫天坛较远，需坐地铁。"
+        },
+        {
+          "area": "中关村/五道口",
+          "lat": 39.983,
+          "lng": 116.315,
+          "pros": "高校区，去颐和园、圆明园、香山顺路。",
+          "cons": "到市中心通勤 40 分钟以上。"
+        }
+      ],
+      "attractions": [
+        {
+          "name": "故宫博物院",
+          "district": "东城区",
+          "lat": 39.9163,
+          "lng": 116.3972,
+          "visit_minutes": 210,
+          "heat": 99,
+          "must_visit": true,
+          "intro": "必须提前实名预约，从午门进、神武门出最顺。",
+          "tags": [
+            "世界遗产",
+            "必去"
+          ]
+        },
+        {
+          "name": "天安门广场",
+          "district": "东城区",
+          "lat": 39.9055,
+          "lng": 116.3976,
+          "visit_minutes": 60,
+          "heat": 96,
+          "must_visit": true,
+          "intro": "进广场需安检预约，看升旗要凌晨到。",
+          "tags": [
+            "地标",
+            "必去"
+          ]
+        },
+        {
+          "name": "八达岭长城",
+          "district": "延庆区",
+          "lat": 40.3565,
+          "lng": 116.02,
+          "visit_minutes": 240,
+          "heat": 97,
+          "must_visit": true,
+          "intro": "往返车程 3 小时起，务必单独占一整天。",
+          "tags": [
+            "世界遗产",
+            "登山"
+          ]
+        },
+        {
+          "name": "颐和园",
+          "district": "海淀区",
+          "lat": 39.9999,
+          "lng": 116.2755,
+          "visit_minutes": 180,
+          "heat": 95,
+          "must_visit": true,
+          "intro": "从北宫门进、东宫门出可以少走回头路。",
+          "tags": [
+            "世界遗产",
+            "园林"
+          ]
+        },
+        {
+          "name": "天坛公园",
+          "district": "东城区",
+          "lat": 39.8822,
+          "lng": 116.4066,
+          "visit_minutes": 120,
+          "heat": 93,
+          "must_visit": false,
+          "intro": "祈年殿是核心，早上有大爷在长廊唱戏。",
+          "tags": [
+            "世界遗产"
+          ]
+        },
+        {
+          "name": "圆明园",
+          "district": "海淀区",
+          "lat": 40.008,
+          "lng": 116.297,
+          "visit_minutes": 150,
+          "heat": 85,
+          "must_visit": false,
+          "intro": "西洋楼遗址在东北角，园子极大建议租电瓶车。",
+          "tags": [
+            "历史",
+            "园林"
+          ]
+        },
+        {
+          "name": "什刹海",
+          "district": "西城区",
+          "lat": 39.94,
+          "lng": 116.383,
+          "visit_minutes": 90,
+          "heat": 86,
+          "must_visit": false,
+          "intro": "沿湖胡同与酒吧，傍晚租船或骑车最舒服。",
+          "tags": [
+            "胡同",
+            "夜景"
+          ]
+        },
+        {
+          "name": "南锣鼓巷",
+          "district": "东城区",
+          "lat": 39.937,
+          "lng": 116.403,
+          "visit_minutes": 90,
+          "heat": 84,
+          "must_visit": false,
+          "intro": "主街商业化重，两侧的帽儿胡同、雨儿胡同更好逛。",
+          "tags": [
+            "胡同",
+            "小吃"
+          ]
+        },
+        {
+          "name": "恭王府",
+          "district": "西城区",
+          "lat": 39.937,
+          "lng": 116.38,
+          "visit_minutes": 90,
+          "heat": 87,
+          "must_visit": false,
+          "intro": "和珅宅邸，需预约，福字碑要排队摸。",
+          "tags": [
+            "历史"
+          ]
+        },
+        {
+          "name": "雍和宫",
+          "district": "东城区",
+          "lat": 39.947,
+          "lng": 116.417,
+          "visit_minutes": 90,
+          "heat": 85,
+          "must_visit": false,
+          "intro": "北京香火最旺的藏传佛教寺院，进门免费发香。",
+          "tags": [
+            "宗教"
+          ]
+        },
+        {
+          "name": "北海公园",
+          "district": "西城区",
+          "lat": 39.925,
+          "lng": 116.389,
+          "visit_minutes": 120,
+          "heat": 84,
+          "must_visit": false,
+          "intro": "琼华岛白塔是标志，与什刹海、景山可连成一线。",
+          "tags": [
+            "园林"
+          ]
+        },
+        {
+          "name": "国家体育场(鸟巢)",
+          "district": "朝阳区",
+          "lat": 39.993,
+          "lng": 116.3964,
+          "visit_minutes": 90,
+          "heat": 82,
+          "must_visit": false,
+          "intro": "与鸟巢水立方连看，夜景灯光比白天出片。",
+          "tags": [
+            "地标",
+            "夜景"
+          ]
+        },
+        {
+          "name": "水立方",
+          "district": "朝阳区",
+          "lat": 39.993,
+          "lng": 116.383,
+          "visit_minutes": 60,
+          "heat": 78,
+          "must_visit": false,
+          "intro": "与鸟巢一街之隔，内含室内水上乐园。",
+          "tags": [
+            "地标",
+            "亲子"
+          ]
+        },
+        {
+          "name": "798艺术区",
+          "district": "朝阳区",
+          "lat": 39.984,
+          "lng": 116.495,
+          "visit_minutes": 120,
+          "heat": 80,
+          "must_visit": false,
+          "intro": "老厂房里的画廊群，周一多数展馆闭馆。",
+          "tags": [
+            "艺术",
+            "文创"
+          ]
+        },
+        {
+          "name": "景山公园",
+          "district": "西城区",
+          "lat": 39.928,
+          "lng": 116.394,
+          "visit_minutes": 60,
+          "heat": 83,
+          "must_visit": false,
+          "intro": "万春亭拍故宫全景的唯一机位，日落时最挤。",
+          "tags": [
+            "登高",
+            "摄影"
+          ]
+        },
+        {
+          "name": "前门大街",
+          "district": "东城区",
+          "lat": 39.899,
+          "lng": 116.398,
+          "visit_minutes": 90,
+          "heat": 81,
+          "must_visit": false,
+          "intro": "中轴线南段，铛铛车与老字号集中。",
+          "tags": [
+            "商业街"
+          ]
+        },
+        {
+          "name": "中国国家博物馆",
+          "district": "东城区",
+          "lat": 39.905,
+          "lng": 116.402,
+          "visit_minutes": 150,
+          "heat": 88,
+          "must_visit": false,
+          "intro": "免费但需提前预约，古代中国基本陈列必看。",
+          "tags": [
+            "博物馆"
+          ]
+        },
+        {
+          "name": "清华大学/北京大学",
+          "district": "海淀区",
+          "lat": 39.999,
+          "lng": 116.326,
+          "visit_minutes": 90,
+          "heat": 76,
+          "must_visit": false,
+          "intro": "进校需预约，与颐和园圆明园同方向可拼一天。",
+          "tags": [
+            "校园"
+          ]
+        },
+        {
+          "name": "香山公园",
+          "district": "海淀区",
+          "lat": 39.993,
+          "lng": 116.193,
+          "visit_minutes": 180,
+          "heat": 79,
+          "must_visit": false,
+          "intro": "10 月下旬红叶季人山人海，平日清静。",
+          "tags": [
+            "登山",
+            "自然"
+          ]
+        },
+        {
+          "name": "明十三陵",
+          "district": "昌平区",
+          "lat": 40.252,
+          "lng": 116.235,
+          "visit_minutes": 180,
+          "heat": 77,
+          "must_visit": false,
+          "intro": "定陵地宫已开放，与八达岭同方向可拼一天。",
+          "tags": [
+            "世界遗产",
+            "近郊"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "上海",
+      "pinyin": "shanghai",
+      "emoji": "🌃",
+      "tagline": "万国建筑与摩天楼同框",
+      "heat": 96,
+      "center_lat": 31.2304,
+      "center_lng": 121.4737,
+      "hotel_areas": [
+        {
+          "area": "南京东路/人民广场",
+          "lat": 31.233,
+          "lng": 121.475,
+          "pros": "地铁1/2/8号线交汇，外滩步行可达，去哪都方便。",
+          "cons": "游客密度极高，晚上较吵。"
+        },
+        {
+          "area": "陆家嘴",
+          "lat": 31.239,
+          "lng": 121.503,
+          "pros": "江景房视野最好，去浦东各点极顺。",
+          "cons": "过江到浦西老城需坐地铁。"
+        },
+        {
+          "area": "静安寺",
+          "lat": 31.223,
+          "lng": 121.445,
+          "pros": "商圈成熟、餐饮强，2/7 号线换乘方便。",
+          "cons": "到外滩需 20 分钟车程。"
+        },
+        {
+          "area": "徐家汇",
+          "lat": 31.195,
+          "lng": 121.437,
+          "pros": "武康路、衡复风貌区步行可达，适合慢逛。",
+          "cons": "离核心景点群偏西。"
+        }
+      ],
+      "attractions": [
+        {
+          "name": "外滩",
+          "district": "黄浦区",
+          "lat": 31.24,
+          "lng": 121.49,
+          "visit_minutes": 90,
+          "heat": 97,
+          "must_visit": true,
+          "intro": "万国建筑博览群，19:00 后亮灯，江对岸看陆家嘴最好。",
+          "tags": [
+            "地标",
+            "夜景",
+            "必去"
+          ]
+        },
+        {
+          "name": "东方明珠",
+          "district": "浦东新区",
+          "lat": 31.2397,
+          "lng": 121.4998,
+          "visit_minutes": 120,
+          "heat": 94,
+          "must_visit": true,
+          "intro": "259 米观光层玻璃走廊，建议傍晚上去看日落接夜景。",
+          "tags": [
+            "地标",
+            "登高"
+          ]
+        },
+        {
+          "name": "豫园",
+          "district": "黄浦区",
+          "lat": 31.227,
+          "lng": 121.492,
+          "visit_minutes": 90,
+          "heat": 90,
+          "must_visit": true,
+          "intro": "江南园林与城隍庙小吃街连着，南翔小笼要排长队。",
+          "tags": [
+            "园林",
+            "小吃"
+          ]
+        },
+        {
+          "name": "南京路步行街",
+          "district": "黄浦区",
+          "lat": 31.235,
+          "lng": 121.475,
+          "visit_minutes": 90,
+          "heat": 89,
+          "must_visit": false,
+          "intro": "从人民广场一路走到外滩，正好当过渡路线。",
+          "tags": [
+            "购物",
+            "商业街"
+          ]
+        },
+        {
+          "name": "上海迪士尼乐园",
+          "district": "浦东新区",
+          "lat": 31.1443,
+          "lng": 121.657,
+          "visit_minutes": 480,
+          "heat": 95,
+          "must_visit": false,
+          "intro": "必须单独占一整天，地铁11号线直达，早到能多刷两个项目。",
+          "tags": [
+            "主题乐园",
+            "亲子"
+          ]
+        },
+        {
+          "name": "田子坊",
+          "district": "黄浦区",
+          "lat": 31.21,
+          "lng": 121.469,
+          "visit_minutes": 90,
+          "heat": 84,
+          "must_visit": false,
+          "intro": "石库门弄堂改造的小店群，巷道窄，工作日人少些。",
+          "tags": [
+            "文创",
+            "小店"
+          ]
+        },
+        {
+          "name": "新天地",
+          "district": "黄浦区",
+          "lat": 31.221,
+          "lng": 121.475,
+          "visit_minutes": 90,
+          "heat": 83,
+          "must_visit": false,
+          "intro": "石库门外壳里的西式餐饮区，晚上氛围好。",
+          "tags": [
+            "餐饮",
+            "夜景"
+          ]
+        },
+        {
+          "name": "上海博物馆",
+          "district": "黄浦区",
+          "lat": 31.228,
+          "lng": 121.475,
+          "visit_minutes": 150,
+          "heat": 86,
+          "must_visit": false,
+          "intro": "青铜器与瓷器馆是强项，人民广场正中，需预约。",
+          "tags": [
+            "博物馆"
+          ]
+        },
+        {
+          "name": "武康路",
+          "district": "徐汇区",
+          "lat": 31.208,
+          "lng": 121.438,
+          "visit_minutes": 90,
+          "heat": 85,
+          "must_visit": false,
+          "intro": "梧桐树下的老洋房街，武康大楼是打卡点。",
+          "tags": [
+            "街拍",
+            "历史"
+          ]
+        },
+        {
+          "name": "静安寺",
+          "district": "静安区",
+          "lat": 31.223,
+          "lng": 121.445,
+          "visit_minutes": 60,
+          "heat": 80,
+          "must_visit": false,
+          "intro": "金顶寺院嵌在商圈里，门口即地铁站。",
+          "tags": [
+            "宗教"
+          ]
+        },
+        {
+          "name": "上海科技馆",
+          "district": "浦东新区",
+          "lat": 31.22,
+          "lng": 121.544,
+          "visit_minutes": 150,
+          "heat": 82,
+          "must_visit": false,
+          "intro": "亲子向，动物世界与机器人展区最受欢迎。",
+          "tags": [
+            "亲子",
+            "博物馆"
+          ]
+        },
+        {
+          "name": "上海环球金融中心",
+          "district": "浦东新区",
+          "lat": 31.2345,
+          "lng": 121.5075,
+          "visit_minutes": 90,
+          "heat": 83,
+          "must_visit": false,
+          "intro": "100 层观光天阁有透明玻璃地板。",
+          "tags": [
+            "登高"
+          ]
+        },
+        {
+          "name": "陆家嘴",
+          "district": "浦东新区",
+          "lat": 31.239,
+          "lng": 121.503,
+          "visit_minutes": 90,
+          "heat": 88,
+          "must_visit": false,
+          "intro": "三件套同框机位在滨江天桥，与外滩隔江相望。",
+          "tags": [
+            "地标",
+            "夜景"
+          ]
+        },
+        {
+          "name": "朱家角古镇",
+          "district": "青浦区",
+          "lat": 31.112,
+          "lng": 121.053,
+          "visit_minutes": 180,
+          "heat": 80,
+          "must_visit": false,
+          "intro": "距市区 1.5 小时，放生桥与北大街是核心。",
+          "tags": [
+            "古镇",
+            "近郊"
+          ]
+        },
+        {
+          "name": "上海自然博物馆",
+          "district": "静安区",
+          "lat": 31.234,
+          "lng": 121.468,
+          "visit_minutes": 150,
+          "heat": 81,
+          "must_visit": false,
+          "intro": "恐龙骨架与演化之路展线，适合带孩子。",
+          "tags": [
+            "亲子",
+            "博物馆"
+          ]
+        },
+        {
+          "name": "1933老场坊",
+          "district": "虹口区",
+          "lat": 31.253,
+          "lng": 121.493,
+          "visit_minutes": 60,
+          "heat": 72,
+          "must_visit": false,
+          "intro": "原远东最大屠宰场，伞形柱与廊桥很有张力。",
+          "tags": [
+            "建筑",
+            "摄影"
+          ]
+        },
+        {
+          "name": "多伦路文化名人街",
+          "district": "虹口区",
+          "lat": 31.264,
+          "lng": 121.483,
+          "visit_minutes": 60,
+          "heat": 70,
+          "must_visit": false,
+          "intro": "鲁迅、茅盾旧居聚集的小街，安静有味道。",
+          "tags": [
+            "历史",
+            "街区"
+          ]
+        },
+        {
+          "name": "世博公园",
+          "district": "浦东新区",
+          "lat": 31.188,
+          "lng": 121.49,
+          "visit_minutes": 90,
+          "heat": 72,
+          "must_visit": false,
+          "intro": "沿江滨水步道，人少，适合傍晚散步骑行。",
+          "tags": [
+            "公园",
+            "滨江"
+          ]
+        },
+        {
+          "name": "上海中心大厦",
+          "district": "浦东新区",
+          "lat": 31.2336,
+          "lng": 121.5057,
+          "visit_minutes": 120,
+          "heat": 86,
+          "must_visit": false,
+          "intro": "632 米中国第一高楼，118 层观光厅需预约。",
+          "tags": [
+            "地标",
+            "登高"
+          ]
+        },
+        {
+          "name": "思南公馆",
+          "district": "黄浦区",
+          "lat": 31.215,
+          "lng": 121.465,
+          "visit_minutes": 60,
+          "heat": 75,
+          "must_visit": false,
+          "intro": "复兴公园旁的花园洋房群，书店与咖啡馆密度高。",
+          "tags": [
+            "街区",
+            "咖啡"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "西安",
+      "pinyin": "xian",
+      "emoji": "🏛️",
+      "tagline": "十三朝古都 · 一城看千年",
+      "heat": 95,
+      "center_lat": 34.3416,
+      "center_lng": 108.9398,
+      "hotel_areas": [
+        {
+          "area": "钟楼/回民街",
+          "lat": 34.262,
+          "lng": 108.942,
+          "pros": "城墙内正中，地铁2号线，去回民街、城墙、碑林步行可达。",
+          "cons": "老城区酒店设施偏旧，夜间回民街嘈杂。"
+        },
+        {
+          "area": "大雁塔/大唐不夜城",
+          "lat": 34.216,
+          "lng": 108.962,
+          "pros": "夜景与演出集中，晚上出门就是大唐不夜城。",
+          "cons": "去兵马俑、华山需先横穿市区。"
+        },
+        {
+          "area": "城墙南门(永宁门)",
+          "lat": 34.252,
+          "lng": 108.945,
+          "pros": "紧贴城墙，去碑林、小雁塔都近，环境比钟楼安静。",
+          "cons": "餐饮选择不如回民街丰富。"
+        }
+      ],
+      "attractions": [
+        {
+          "name": "秦始皇兵马俑",
+          "district": "临潼区",
+          "lat": 34.385,
+          "lng": 109.273,
+          "visit_minutes": 210,
+          "heat": 98,
+          "must_visit": true,
+          "intro": "往返市区 2.5 小时，建议上午出发，一号坑先看。",
+          "tags": [
+            "世界遗产",
+            "必去"
+          ]
+        },
+        {
+          "name": "西安城墙",
+          "district": "碑林区",
+          "lat": 34.26,
+          "lng": 108.95,
+          "visit_minutes": 120,
+          "heat": 94,
+          "must_visit": true,
+          "intro": "可租自行车环城 13.7 km，约 1.5 小时，日落时段最佳。",
+          "tags": [
+            "地标",
+            "骑行"
+          ]
+        },
+        {
+          "name": "大雁塔",
+          "district": "雁塔区",
+          "lat": 34.219,
+          "lng": 108.96,
+          "visit_minutes": 90,
+          "heat": 92,
+          "must_visit": true,
+          "intro": "大慈恩寺内，北广场音乐喷泉晚间有场次。",
+          "tags": [
+            "历史",
+            "地标"
+          ]
+        },
+        {
+          "name": "大唐不夜城",
+          "district": "雁塔区",
+          "lat": 34.213,
+          "lng": 108.964,
+          "visit_minutes": 120,
+          "heat": 95,
+          "must_visit": true,
+          "intro": "免费步行街，18:30 后亮灯，不倒翁小姐姐在这。",
+          "tags": [
+            "夜景",
+            "免费"
+          ]
+        },
+        {
+          "name": "回民街",
+          "district": "莲湖区",
+          "lat": 34.268,
+          "lng": 108.94,
+          "visit_minutes": 90,
+          "heat": 90,
+          "must_visit": false,
+          "intro": "主街偏游客化，往西羊市、大皮院走才是本地味道。",
+          "tags": [
+            "小吃",
+            "市井"
+          ]
+        },
+        {
+          "name": "钟楼",
+          "district": "碑林区",
+          "lat": 34.261,
+          "lng": 108.945,
+          "visit_minutes": 45,
+          "heat": 89,
+          "must_visit": false,
+          "intro": "古城几何中心，登楼可俯瞰四条大街。",
+          "tags": [
+            "地标"
+          ]
+        },
+        {
+          "name": "鼓楼",
+          "district": "莲湖区",
+          "lat": 34.262,
+          "lng": 108.94,
+          "visit_minutes": 45,
+          "heat": 85,
+          "must_visit": false,
+          "intro": "与钟楼联票更划算，鼓乐表演有固定场次。",
+          "tags": [
+            "地标"
+          ]
+        },
+        {
+          "name": "陕西历史博物馆",
+          "district": "雁塔区",
+          "lat": 34.225,
+          "lng": 108.954,
+          "visit_minutes": 180,
+          "heat": 93,
+          "must_visit": false,
+          "intro": "免费票极难约，务必提前 3 天抢，何家村窖藏是精华。",
+          "tags": [
+            "博物馆",
+            "必看"
+          ]
+        },
+        {
+          "name": "华清宫",
+          "district": "临潼区",
+          "lat": 34.362,
+          "lng": 109.218,
+          "visit_minutes": 150,
+          "heat": 88,
+          "must_visit": false,
+          "intro": "与兵马俑同在临潼，可拼一天，晚上有《长恨歌》演出。",
+          "tags": [
+            "历史",
+            "演出"
+          ]
+        },
+        {
+          "name": "华山",
+          "district": "华阴市",
+          "lat": 34.482,
+          "lng": 110.085,
+          "visit_minutes": 420,
+          "heat": 96,
+          "must_visit": false,
+          "intro": "高铁 40 分钟可达，西峰索道上北峰下最省力，需整天。",
+          "tags": [
+            "登山",
+            "近郊"
+          ]
+        },
+        {
+          "name": "大唐芙蓉园",
+          "district": "雁塔区",
+          "lat": 34.215,
+          "lng": 108.976,
+          "visit_minutes": 150,
+          "heat": 86,
+          "must_visit": false,
+          "intro": "唐风园林，夜景灯光与《梦回大唐》演出是重点。",
+          "tags": [
+            "园林",
+            "夜景"
+          ]
+        },
+        {
+          "name": "永兴坊",
+          "district": "新城区",
+          "lat": 34.268,
+          "lng": 108.957,
+          "visit_minutes": 90,
+          "heat": 83,
+          "must_visit": false,
+          "intro": "陕西非遗美食集中地，摔碗酒在这，比回民街好逛。",
+          "tags": [
+            "小吃"
+          ]
+        },
+        {
+          "name": "大明宫国家遗址公园",
+          "district": "新城区",
+          "lat": 34.299,
+          "lng": 108.958,
+          "visit_minutes": 120,
+          "heat": 80,
+          "must_visit": false,
+          "intro": "唐代宫城遗址，园区极大，建议租自行车。",
+          "tags": [
+            "遗址",
+            "公园"
+          ]
+        },
+        {
+          "name": "小雁塔",
+          "district": "碑林区",
+          "lat": 34.24,
+          "lng": 108.947,
+          "visit_minutes": 60,
+          "heat": 78,
+          "must_visit": false,
+          "intro": "与西安博物院同一园区，免费，比大雁塔清静。",
+          "tags": [
+            "历史"
+          ]
+        },
+        {
+          "name": "碑林博物馆",
+          "district": "碑林区",
+          "lat": 34.253,
+          "lng": 108.953,
+          "visit_minutes": 90,
+          "heat": 82,
+          "must_visit": false,
+          "intro": "书法爱好者必到，与城墙南门相邻可连着走。",
+          "tags": [
+            "博物馆",
+            "书法"
+          ]
+        },
+        {
+          "name": "西安博物院",
+          "district": "碑林区",
+          "lat": 34.241,
+          "lng": 108.946,
+          "visit_minutes": 120,
+          "heat": 77,
+          "must_visit": false,
+          "intro": "小雁塔旁的市级馆，人少免费，适合补课。",
+          "tags": [
+            "博物馆"
+          ]
+        },
+        {
+          "name": "曲江池遗址公园",
+          "district": "雁塔区",
+          "lat": 34.199,
+          "lng": 108.977,
+          "visit_minutes": 90,
+          "heat": 74,
+          "must_visit": false,
+          "intro": "大唐不夜城南侧的开放式湖景公园，适合傍晚散步。",
+          "tags": [
+            "公园"
+          ]
+        },
+        {
+          "name": "青龙寺",
+          "district": "雁塔区",
+          "lat": 34.229,
+          "lng": 109.006,
+          "visit_minutes": 60,
+          "heat": 72,
+          "must_visit": false,
+          "intro": "3 月下旬樱花季最美，平日冷清。",
+          "tags": [
+            "宗教",
+            "赏花"
+          ]
+        },
+        {
+          "name": "高家大院",
+          "district": "莲湖区",
+          "lat": 34.266,
+          "lng": 108.94,
+          "visit_minutes": 45,
+          "heat": 70,
+          "must_visit": false,
+          "intro": "回民街里的明清院落，有皮影戏表演。",
+          "tags": [
+            "历史",
+            "民俗"
+          ]
+        },
+        {
+          "name": "白鹿原影视城",
+          "district": "蓝田县",
+          "lat": 34.106,
+          "lng": 109.062,
+          "visit_minutes": 180,
+          "heat": 73,
+          "must_visit": false,
+          "intro": "关中民俗实景地，距市区 1 小时，适合亲子。",
+          "tags": [
+            "影视",
+            "近郊"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "杭州",
+      "pinyin": "hangzhou",
+      "emoji": "⛵",
+      "tagline": "一半山水一半城",
+      "heat": 94,
+      "center_lat": 30.2741,
+      "center_lng": 120.1551,
+      "hotel_areas": [
+        {
+          "area": "西湖湖滨",
+          "lat": 30.253,
+          "lng": 120.162,
+          "pros": "出门就是西湖与音乐喷泉，地铁1号线，逛街吃饭最方便。",
+          "cons": "旺季房价高，人多。"
+        },
+        {
+          "area": "灵隐/北高峰",
+          "lat": 30.242,
+          "lng": 120.108,
+          "pros": "被茶园与寺庙包围，清静，适合早起。",
+          "cons": "晚上没什么可逛，进城需坐车。"
+        },
+        {
+          "area": "钱江新城",
+          "lat": 30.245,
+          "lng": 120.21,
+          "pros": "新城酒店性价比高，江景好，地铁直达。",
+          "cons": "到西湖需 25 分钟地铁。"
+        },
+        {
+          "area": "龙井/满觉陇",
+          "lat": 30.223,
+          "lng": 120.115,
+          "pros": "民宿感最强，推窗是茶山，适合慢住。",
+          "cons": "公共交通弱，基本要打车。"
+        }
+      ],
+      "attractions": [
+        {
+          "name": "西湖",
+          "district": "西湖区",
+          "lat": 30.247,
+          "lng": 120.14,
+          "visit_minutes": 180,
+          "heat": 98,
+          "must_visit": true,
+          "intro": "环湖 15 km，建议北线白堤—断桥 + 南线苏堤分段走，别硬走全程。",
+          "tags": [
+            "世界遗产",
+            "必去"
+          ]
+        },
+        {
+          "name": "灵隐寺",
+          "district": "西湖区",
+          "lat": 30.24,
+          "lng": 120.1,
+          "visit_minutes": 120,
+          "heat": 92,
+          "must_visit": true,
+          "intro": "飞来峰景区与寺票分开买，早上 7:00 前人最少。",
+          "tags": [
+            "宗教",
+            "必去"
+          ]
+        },
+        {
+          "name": "雷峰塔",
+          "district": "西湖区",
+          "lat": 30.232,
+          "lng": 120.148,
+          "visit_minutes": 60,
+          "heat": 88,
+          "must_visit": false,
+          "intro": "登塔俯瞰南线湖景，与净慈寺相邻。",
+          "tags": [
+            "登高",
+            "地标"
+          ]
+        },
+        {
+          "name": "断桥残雪",
+          "district": "西湖区",
+          "lat": 30.262,
+          "lng": 120.145,
+          "visit_minutes": 45,
+          "heat": 87,
+          "must_visit": false,
+          "intro": "白堤东端起点，清晨无人时最好拍。",
+          "tags": [
+            "地标",
+            "摄影"
+          ]
+        },
+        {
+          "name": "河坊街",
+          "district": "上城区",
+          "lat": 30.24,
+          "lng": 120.172,
+          "visit_minutes": 90,
+          "heat": 84,
+          "must_visit": false,
+          "intro": "南宋御街旁的仿古商业街，胡庆余堂可顺路看。",
+          "tags": [
+            "小吃",
+            "商业街"
+          ]
+        },
+        {
+          "name": "南宋御街",
+          "district": "上城区",
+          "lat": 30.242,
+          "lng": 120.17,
+          "visit_minutes": 90,
+          "heat": 80,
+          "must_visit": false,
+          "intro": "中山中路老街区，咖啡馆与老字号混在一起。",
+          "tags": [
+            "街区"
+          ]
+        },
+        {
+          "name": "西溪湿地",
+          "district": "西湖区",
+          "lat": 30.27,
+          "lng": 120.07,
+          "visit_minutes": 180,
+          "heat": 86,
+          "must_visit": false,
+          "intro": "面积大，建议坐船进、步行出，东区比西区好玩。",
+          "tags": [
+            "自然",
+            "湿地"
+          ]
+        },
+        {
+          "name": "宋城",
+          "district": "西湖区",
+          "lat": 30.19,
+          "lng": 120.096,
+          "visit_minutes": 240,
+          "heat": 85,
+          "must_visit": false,
+          "intro": "《宋城千古情》是核心，建议买下午场联票。",
+          "tags": [
+            "演出",
+            "主题园"
+          ]
+        },
+        {
+          "name": "龙井村",
+          "district": "西湖区",
+          "lat": 30.223,
+          "lng": 120.115,
+          "visit_minutes": 120,
+          "heat": 82,
+          "must_visit": false,
+          "intro": "茶山步道可走到九溪，路边农家茶可现炒现喝。",
+          "tags": [
+            "茶园",
+            "徒步"
+          ]
+        },
+        {
+          "name": "苏堤春晓",
+          "district": "西湖区",
+          "lat": 30.24,
+          "lng": 120.135,
+          "visit_minutes": 60,
+          "heat": 86,
+          "must_visit": false,
+          "intro": "2.8 km 长堤，清晨骑行穿过最舒服。",
+          "tags": [
+            "地标",
+            "骑行"
+          ]
+        },
+        {
+          "name": "三潭印月",
+          "district": "西湖区",
+          "lat": 30.24,
+          "lng": 120.144,
+          "visit_minutes": 90,
+          "heat": 89,
+          "must_visit": false,
+          "intro": "湖中小岛，需坐船前往，一元纸币背面就是它。",
+          "tags": [
+            "地标",
+            "游船"
+          ]
+        },
+        {
+          "name": "岳王庙",
+          "district": "西湖区",
+          "lat": 30.247,
+          "lng": 120.137,
+          "visit_minutes": 60,
+          "heat": 78,
+          "must_visit": false,
+          "intro": "栖霞岭下，与曲院风荷、苏堤北端连着走。",
+          "tags": [
+            "历史"
+          ]
+        },
+        {
+          "name": "浙江省博物馆",
+          "district": "西湖区",
+          "lat": 30.25,
+          "lng": 120.142,
+          "visit_minutes": 120,
+          "heat": 76,
+          "must_visit": false,
+          "intro": "孤山馆区在西湖中，免费，可顺路看西泠印社。",
+          "tags": [
+            "博物馆"
+          ]
+        },
+        {
+          "name": "千岛湖",
+          "district": "淳安县",
+          "lat": 29.605,
+          "lng": 119.042,
+          "visit_minutes": 360,
+          "heat": 84,
+          "must_visit": false,
+          "intro": "距市区 2 小时高铁，需单独安排一天或住一晚。",
+          "tags": [
+            "自然",
+            "近郊"
+          ]
+        },
+        {
+          "name": "良渚古城遗址公园",
+          "district": "余杭区",
+          "lat": 30.39,
+          "lng": 120.0,
+          "visit_minutes": 180,
+          "heat": 75,
+          "must_visit": false,
+          "intro": "五千年文明实证地，园区大需坐观光车。",
+          "tags": [
+            "世界遗产"
+          ]
+        },
+        {
+          "name": "京杭大运河(拱宸桥)",
+          "district": "拱墅区",
+          "lat": 30.293,
+          "lng": 120.158,
+          "visit_minutes": 90,
+          "heat": 74,
+          "must_visit": false,
+          "intro": "拱宸桥与桥西历史街区，可坐水上巴士前往。",
+          "tags": [
+            "历史",
+            "游船"
+          ]
+        },
+        {
+          "name": "塘栖古镇",
+          "district": "临平区",
+          "lat": 30.49,
+          "lng": 120.2,
+          "visit_minutes": 150,
+          "heat": 72,
+          "must_visit": false,
+          "intro": "运河边的老镇，枇杷季最热闹，距市区 40 分钟。",
+          "tags": [
+            "古镇",
+            "近郊"
+          ]
+        },
+        {
+          "name": "九溪烟树",
+          "district": "西湖区",
+          "lat": 30.21,
+          "lng": 120.115,
+          "visit_minutes": 120,
+          "heat": 77,
+          "must_visit": false,
+          "intro": "溪水穿林的徒步线，从龙井村走下来刚好。",
+          "tags": [
+            "徒步",
+            "自然"
+          ]
+        },
+        {
+          "name": "中国美术学院象山校区",
+          "district": "西湖区",
+          "lat": 30.156,
+          "lng": 120.083,
+          "visit_minutes": 90,
+          "heat": 71,
+          "must_visit": false,
+          "intro": "王澍设计的建筑群，需预约入校，转塘方向。",
+          "tags": [
+            "建筑",
+            "校园"
+          ]
+        },
+        {
+          "name": "湘湖",
+          "district": "萧山区",
+          "lat": 30.14,
+          "lng": 120.2,
+          "visit_minutes": 150,
+          "heat": 70,
+          "must_visit": false,
+          "intro": "西湖的“姊妹湖”，人少，跨湖桥遗址博物馆在这。",
+          "tags": [
+            "自然",
+            "公园"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "重庆",
+      "pinyin": "chongqing",
+      "emoji": "🌉",
+      "tagline": "8D 魔幻立体城市",
+      "heat": 95,
+      "center_lat": 29.563,
+      "center_lng": 106.5516,
+      "hotel_areas": [
+        {
+          "area": "解放碑/洪崖洞",
+          "lat": 29.559,
+          "lng": 106.579,
+          "pros": "景点密度最高，晚上出门就是洪崖洞与千厮门大桥。",
+          "cons": "游客多、房价高、地形爬坡多。"
+        },
+        {
+          "area": "观音桥",
+          "lat": 29.59,
+          "lng": 106.532,
+          "pros": "本地人商圈，餐饮购物强，地铁3/9号线，性价比高。",
+          "cons": "到渝中半岛需过江，20 分钟。"
+        },
+        {
+          "area": "南坪/南滨路",
+          "lat": 29.54,
+          "lng": 106.572,
+          "pros": "看渝中半岛夜景的最佳岸线，酒店新。",
+          "cons": "跨江通勤，去磁器口较远。"
+        }
+      ],
+      "attractions": [
+        {
+          "name": "洪崖洞",
+          "district": "渝中区",
+          "lat": 29.562,
+          "lng": 106.583,
+          "visit_minutes": 90,
+          "heat": 97,
+          "must_visit": true,
+          "intro": "18:30 后亮灯，观景最佳位在千厮门大桥上，别在洞里挤。",
+          "tags": [
+            "夜景",
+            "必去"
+          ]
+        },
+        {
+          "name": "解放碑",
+          "district": "渝中区",
+          "lat": 29.558,
+          "lng": 106.577,
+          "visit_minutes": 60,
+          "heat": 92,
+          "must_visit": true,
+          "intro": "商圈核心，从这里步行 10 分钟可达洪崖洞。",
+          "tags": [
+            "地标",
+            "购物"
+          ]
+        },
+        {
+          "name": "磁器口古镇",
+          "district": "沙坪坝区",
+          "lat": 29.583,
+          "lng": 106.453,
+          "visit_minutes": 120,
+          "heat": 90,
+          "must_visit": true,
+          "intro": "老码头古镇，陈麻花要排队，往宝轮寺方向人少些。",
+          "tags": [
+            "古镇",
+            "小吃"
+          ]
+        },
+        {
+          "name": "李子坝轻轨穿楼",
+          "district": "渝中区",
+          "lat": 29.554,
+          "lng": 106.521,
+          "visit_minutes": 30,
+          "heat": 88,
+          "must_visit": false,
+          "intro": "2 号线穿楼而过，观景平台拍照 20 分钟足够。",
+          "tags": [
+            "打卡",
+            "地标"
+          ]
+        },
+        {
+          "name": "长江索道",
+          "district": "渝中区",
+          "lat": 29.56,
+          "lng": 106.585,
+          "visit_minutes": 60,
+          "heat": 89,
+          "must_visit": false,
+          "intro": "过江索道，建议从新华路站往南岸方向坐，排队较久。",
+          "tags": [
+            "体验",
+            "地标"
+          ]
+        },
+        {
+          "name": "南山一棵树观景台",
+          "district": "南岸区",
+          "lat": 29.547,
+          "lng": 106.588,
+          "visit_minutes": 90,
+          "heat": 86,
+          "must_visit": false,
+          "intro": "俯瞰渝中半岛夜景的经典机位，建议 19:30 后上山。",
+          "tags": [
+            "夜景",
+            "摄影"
+          ]
+        },
+        {
+          "name": "鹅岭二厂",
+          "district": "渝中区",
+          "lat": 29.558,
+          "lng": 106.535,
+          "visit_minutes": 90,
+          "heat": 82,
+          "must_visit": false,
+          "intro": "旧印制二厂改造的文创园，天台可看两江。",
+          "tags": [
+            "文创",
+            "街拍"
+          ]
+        },
+        {
+          "name": "朝天门",
+          "district": "渝中区",
+          "lat": 29.568,
+          "lng": 106.59,
+          "visit_minutes": 60,
+          "heat": 85,
+          "must_visit": false,
+          "intro": "两江交汇处，来福士就在旁边，可看船与江景。",
+          "tags": [
+            "地标",
+            "江景"
+          ]
+        },
+        {
+          "name": "武隆天生三桥",
+          "district": "武隆区",
+          "lat": 29.423,
+          "lng": 107.906,
+          "visit_minutes": 300,
+          "heat": 93,
+          "must_visit": false,
+          "intro": "《变形金刚4》取景地，往返 4 小时，需整天或住一晚。",
+          "tags": [
+            "自然",
+            "近郊"
+          ]
+        },
+        {
+          "name": "大足石刻",
+          "district": "大足区",
+          "lat": 29.704,
+          "lng": 105.705,
+          "visit_minutes": 240,
+          "heat": 87,
+          "must_visit": false,
+          "intro": "世界遗产，宝顶山石刻最集中，距市区 1.5 小时。",
+          "tags": [
+            "世界遗产",
+            "近郊"
+          ]
+        },
+        {
+          "name": "白公馆/渣滓洞",
+          "district": "沙坪坝区",
+          "lat": 29.59,
+          "lng": 106.43,
+          "visit_minutes": 120,
+          "heat": 79,
+          "must_visit": false,
+          "intro": "红岩历史遗址，与磁器口同方向可拼半天。",
+          "tags": [
+            "历史",
+            "红色"
+          ]
+        },
+        {
+          "name": "重庆中国三峡博物馆",
+          "district": "渝中区",
+          "lat": 29.559,
+          "lng": 106.548,
+          "visit_minutes": 120,
+          "heat": 80,
+          "must_visit": false,
+          "intro": "人民大礼堂对面，免费，三峡与抗战陪都展是重点。",
+          "tags": [
+            "博物馆"
+          ]
+        },
+        {
+          "name": "观音桥步行街",
+          "district": "江北区",
+          "lat": 29.59,
+          "lng": 106.532,
+          "visit_minutes": 90,
+          "heat": 81,
+          "must_visit": false,
+          "intro": "本地人逛街首选，北城天街餐饮密度极高。",
+          "tags": [
+            "购物",
+            "餐饮"
+          ]
+        },
+        {
+          "name": "弹子石老街",
+          "district": "南岸区",
+          "lat": 29.575,
+          "lng": 106.592,
+          "visit_minutes": 90,
+          "heat": 76,
+          "must_visit": false,
+          "intro": "依山而建的仿古街，看渝中天际线角度很好。",
+          "tags": [
+            "街区",
+            "夜景"
+          ]
+        },
+        {
+          "name": "黄桷坪涂鸦街",
+          "district": "九龙坡区",
+          "lat": 29.489,
+          "lng": 106.498,
+          "visit_minutes": 60,
+          "heat": 74,
+          "must_visit": false,
+          "intro": "川美老校区外的涂鸦楼群，适合拍照。",
+          "tags": [
+            "艺术",
+            "街拍"
+          ]
+        },
+        {
+          "name": "川美美术馆",
+          "district": "九龙坡区",
+          "lat": 29.489,
+          "lng": 106.499,
+          "visit_minutes": 90,
+          "heat": 72,
+          "must_visit": false,
+          "intro": "罗中立美术馆，彩色外墙是打卡点，周一闭馆。",
+          "tags": [
+            "艺术",
+            "博物馆"
+          ]
+        },
+        {
+          "name": "黑山谷",
+          "district": "綦江区",
+          "lat": 28.87,
+          "lng": 106.95,
+          "visit_minutes": 300,
+          "heat": 76,
+          "must_visit": false,
+          "intro": "夏季避暑峡谷徒步，往返 3 小时以上。",
+          "tags": [
+            "自然",
+            "徒步"
+          ]
+        },
+        {
+          "name": "龚滩古镇",
+          "district": "酉阳县",
+          "lat": 28.69,
+          "lng": 108.33,
+          "visit_minutes": 240,
+          "heat": 72,
+          "must_visit": false,
+          "intro": "乌江边的千年古镇，距市区 4.5 小时，建议住一晚。",
+          "tags": [
+            "古镇",
+            "远郊"
+          ]
+        },
+        {
+          "name": "湖广会馆",
+          "district": "渝中区",
+          "lat": 29.563,
+          "lng": 106.59,
+          "visit_minutes": 60,
+          "heat": 73,
+          "must_visit": false,
+          "intro": "清代移民会馆群，就在东水门大桥旁，可与朝天门连看。",
+          "tags": [
+            "历史",
+            "建筑"
+          ]
+        },
+        {
+          "name": "重庆动物园",
+          "district": "九龙坡区",
+          "lat": 29.518,
+          "lng": 106.51,
+          "visit_minutes": 150,
+          "heat": 75,
+          "must_visit": false,
+          "intro": "以熊猫多著称，亲子向，地铁2号线可达。",
+          "tags": [
+            "亲子",
+            "动物园"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "广州",
+      "pinyin": "guangzhou",
+      "emoji": "🏙️",
+      "tagline": "食在广州 · 早茶到宵夜",
+      "heat": 92,
+      "center_lat": 23.1291,
+      "center_lng": 113.2644,
+      "hotel_areas": [
+        {
+          "area": "珠江新城/花城广场",
+          "lat": 23.118,
+          "lng": 113.324,
+          "pros": "CBD 中心，地铁3/5号线，看广州塔与江景步行可达。",
+          "cons": "价格最高，老城味道淡。"
+        },
+        {
+          "area": "北京路/上下九",
+          "lat": 23.122,
+          "lng": 113.265,
+          "pros": "老城核心，早茶与小吃密度最高，最有广州味。",
+          "cons": "老楼多，停车难。"
+        },
+        {
+          "area": "广州塔/琶洲",
+          "lat": 23.107,
+          "lng": 113.325,
+          "pros": "江景房视野一流，去长隆与琶洲展馆顺路。",
+          "cons": "跨江去老城需 25 分钟。"
+        }
+      ],
+      "attractions": [
+        {
+          "name": "广州塔",
+          "district": "海珠区",
+          "lat": 23.1066,
+          "lng": 113.3245,
+          "visit_minutes": 120,
+          "heat": 96,
+          "must_visit": true,
+          "intro": "小蛮腰，建议买 450m 摩天轮套票，日落时段上去。",
+          "tags": [
+            "地标",
+            "必去"
+          ]
+        },
+        {
+          "name": "沙面岛",
+          "district": "荔湾区",
+          "lat": 23.109,
+          "lng": 113.24,
+          "visit_minutes": 90,
+          "heat": 87,
+          "must_visit": true,
+          "intro": "欧陆建筑群小岛，树荫多，适合上午慢走。",
+          "tags": [
+            "建筑",
+            "街拍"
+          ]
+        },
+        {
+          "name": "上下九步行街",
+          "district": "荔湾区",
+          "lat": 23.118,
+          "lng": 113.244,
+          "visit_minutes": 90,
+          "heat": 84,
+          "must_visit": false,
+          "intro": "骑楼老街，银记肠粉、南信双皮奶都在这附近。",
+          "tags": [
+            "小吃",
+            "商业街"
+          ]
+        },
+        {
+          "name": "陈家祠",
+          "district": "荔湾区",
+          "lat": 23.13,
+          "lng": 113.247,
+          "visit_minutes": 90,
+          "heat": 86,
+          "must_visit": false,
+          "intro": "岭南建筑装饰艺术顶峰，砖雕木雕值得细看。",
+          "tags": [
+            "历史",
+            "建筑"
+          ]
+        },
+        {
+          "name": "白云山",
+          "district": "白云区",
+          "lat": 23.183,
+          "lng": 113.298,
+          "visit_minutes": 180,
+          "heat": 85,
+          "must_visit": false,
+          "intro": "摩星岭是市区最高点，可坐缆车上、步行下。",
+          "tags": [
+            "登山",
+            "自然"
+          ]
+        },
+        {
+          "name": "越秀公园",
+          "district": "越秀区",
+          "lat": 23.14,
+          "lng": 113.265,
+          "visit_minutes": 120,
+          "heat": 82,
+          "must_visit": false,
+          "intro": "五羊石像与镇海楼在这，可顺路看南越王墓。",
+          "tags": [
+            "公园",
+            "地标"
+          ]
+        },
+        {
+          "name": "长隆旅游度假区",
+          "district": "番禺区",
+          "lat": 22.995,
+          "lng": 113.33,
+          "visit_minutes": 480,
+          "heat": 94,
+          "must_visit": false,
+          "intro": "野生动物世界与欢乐世界分开，一天只能选一个，需整天。",
+          "tags": [
+            "主题乐园",
+            "亲子"
+          ]
+        },
+        {
+          "name": "北京路步行街",
+          "district": "越秀区",
+          "lat": 23.125,
+          "lng": 113.268,
+          "visit_minutes": 90,
+          "heat": 83,
+          "must_visit": false,
+          "intro": "地下有千年古道遗址展示，晚上比白天热闹。",
+          "tags": [
+            "购物",
+            "商业街"
+          ]
+        },
+        {
+          "name": "珠江夜游",
+          "district": "海珠区",
+          "lat": 23.108,
+          "lng": 113.29,
+          "visit_minutes": 120,
+          "heat": 88,
+          "must_visit": false,
+          "intro": "大沙头或天字码头登船，看两岸灯光，约 1.5 小时。",
+          "tags": [
+            "游船",
+            "夜景"
+          ]
+        },
+        {
+          "name": "石室圣心大教堂",
+          "district": "越秀区",
+          "lat": 23.114,
+          "lng": 113.268,
+          "visit_minutes": 45,
+          "heat": 78,
+          "must_visit": false,
+          "intro": "全石结构哥特教堂，与一德路海味街相邻。",
+          "tags": [
+            "宗教",
+            "建筑"
+          ]
+        },
+        {
+          "name": "黄埔军校旧址",
+          "district": "黄埔区",
+          "lat": 23.088,
+          "lng": 113.423,
+          "visit_minutes": 120,
+          "heat": 76,
+          "must_visit": false,
+          "intro": "长洲岛上，需坐轮渡，可与辛亥革命纪念馆连看。",
+          "tags": [
+            "历史",
+            "红色"
+          ]
+        },
+        {
+          "name": "岭南印象园",
+          "district": "番禺区",
+          "lat": 23.038,
+          "lng": 113.402,
+          "visit_minutes": 120,
+          "heat": 74,
+          "must_visit": false,
+          "intro": "大学城里的岭南水乡园区，适合亲子。",
+          "tags": [
+            "民俗",
+            "亲子"
+          ]
+        },
+        {
+          "name": "广东省博物馆",
+          "district": "天河区",
+          "lat": 23.118,
+          "lng": 113.327,
+          "visit_minutes": 150,
+          "heat": 81,
+          "must_visit": false,
+          "intro": "珠江新城核心，免费预约，潮州木雕与端砚是特色。",
+          "tags": [
+            "博物馆"
+          ]
+        },
+        {
+          "name": "花城广场",
+          "district": "天河区",
+          "lat": 23.118,
+          "lng": 113.324,
+          "visit_minutes": 60,
+          "heat": 80,
+          "must_visit": false,
+          "intro": "中轴线广场，正对广州塔，晚上灯光秀人很多。",
+          "tags": [
+            "地标",
+            "夜景"
+          ]
+        },
+        {
+          "name": "红专厂创意园",
+          "district": "天河区",
+          "lat": 23.117,
+          "lng": 113.376,
+          "visit_minutes": 90,
+          "heat": 71,
+          "must_visit": false,
+          "intro": "罐头厂改造的艺术区，部分区域在改造，去前先查。",
+          "tags": [
+            "文创"
+          ]
+        },
+        {
+          "name": "荔枝湾涌",
+          "district": "荔湾区",
+          "lat": 23.117,
+          "lng": 113.235,
+          "visit_minutes": 90,
+          "heat": 77,
+          "must_visit": false,
+          "intro": "西关水乡风情，可坐小舟，与泮塘、荔湾博物馆连着逛。",
+          "tags": [
+            "水乡",
+            "历史"
+          ]
+        },
+        {
+          "name": "广州动物园",
+          "district": "越秀区",
+          "lat": 23.147,
+          "lng": 113.307,
+          "visit_minutes": 150,
+          "heat": 73,
+          "must_visit": false,
+          "intro": "老牌动物园，门票便宜，熊猫馆是亮点。",
+          "tags": [
+            "亲子",
+            "动物园"
+          ]
+        },
+        {
+          "name": "大夫山森林公园",
+          "district": "番禺区",
+          "lat": 22.953,
+          "lng": 113.316,
+          "visit_minutes": 150,
+          "heat": 70,
+          "must_visit": false,
+          "intro": "骑行与烧烤的周末去处，租车环山约 1 小时。",
+          "tags": [
+            "公园",
+            "骑行"
+          ]
+        },
+        {
+          "name": "南越王博物院",
+          "district": "越秀区",
+          "lat": 23.138,
+          "lng": 113.261,
+          "visit_minutes": 90,
+          "heat": 79,
+          "must_visit": false,
+          "intro": "南越文王墓原址，丝缕玉衣是镇馆之宝。",
+          "tags": [
+            "博物馆",
+            "历史"
+          ]
+        },
+        {
+          "name": "永庆坊",
+          "district": "荔湾区",
+          "lat": 23.117,
+          "lng": 113.241,
+          "visit_minutes": 90,
+          "heat": 82,
+          "must_visit": false,
+          "intro": "恩宁路微改造街区，骑楼与李小龙祖居，文艺感强。",
+          "tags": [
+            "文创",
+            "街区"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "南京",
+      "pinyin": "nanjing",
+      "emoji": "🌸",
+      "tagline": "六朝金粉 · 梧桐与城墙",
+      "heat": 90,
+      "center_lat": 32.0603,
+      "center_lng": 118.7969,
+      "hotel_areas": [
+        {
+          "area": "新街口",
+          "lat": 32.043,
+          "lng": 118.783,
+          "pros": "地铁1/2号线交汇，去总统府、夫子庙、博物院都居中。",
+          "cons": "商圈嘈杂，房价偏高。"
+        },
+        {
+          "area": "夫子庙/老门东",
+          "lat": 32.02,
+          "lng": 118.786,
+          "pros": "秦淮夜景就在楼下，小吃集中，氛围最好。",
+          "cons": "去紫金山方向较远。"
+        },
+        {
+          "area": "鼓楼/玄武湖",
+          "lat": 32.062,
+          "lng": 118.788,
+          "pros": "紧邻玄武湖与鸡鸣寺，去中山陵方向顺路。",
+          "cons": "夜间商业氛围弱一些。"
+        }
+      ],
+      "attractions": [
+        {
+          "name": "中山陵",
+          "district": "玄武区",
+          "lat": 32.059,
+          "lng": 118.85,
+          "visit_minutes": 120,
+          "heat": 95,
+          "must_visit": true,
+          "intro": "392 级台阶，需预约，建议与明孝陵、美龄宫同游。",
+          "tags": [
+            "地标",
+            "必去"
+          ]
+        },
+        {
+          "name": "夫子庙秦淮河",
+          "district": "秦淮区",
+          "lat": 32.023,
+          "lng": 118.788,
+          "visit_minutes": 120,
+          "heat": 94,
+          "must_visit": true,
+          "intro": "18:30 后亮灯最美，可坐画舫夜游秦淮河。",
+          "tags": [
+            "夜景",
+            "必去"
+          ]
+        },
+        {
+          "name": "总统府",
+          "district": "玄武区",
+          "lat": 32.045,
+          "lng": 118.796,
+          "visit_minutes": 120,
+          "heat": 90,
+          "must_visit": true,
+          "intro": "六百年官署变迁，西花园与子超楼是重点。",
+          "tags": [
+            "历史"
+          ]
+        },
+        {
+          "name": "明孝陵",
+          "district": "玄武区",
+          "lat": 32.056,
+          "lng": 118.835,
+          "visit_minutes": 120,
+          "heat": 89,
+          "must_visit": false,
+          "intro": "朱元璋陵寝，神道石象路秋天最美。",
+          "tags": [
+            "世界遗产"
+          ]
+        },
+        {
+          "name": "南京博物院",
+          "district": "玄武区",
+          "lat": 32.043,
+          "lng": 118.822,
+          "visit_minutes": 180,
+          "heat": 91,
+          "must_visit": false,
+          "intro": "免费需预约，民国馆实景街区很出片。",
+          "tags": [
+            "博物馆",
+            "必看"
+          ]
+        },
+        {
+          "name": "侵华日军南京大屠杀遇难同胞纪念馆",
+          "district": "建邺区",
+          "lat": 32.036,
+          "lng": 118.743,
+          "visit_minutes": 120,
+          "heat": 88,
+          "must_visit": false,
+          "intro": "免费预约，参观时请保持肃静，氛围沉重。",
+          "tags": [
+            "历史",
+            "纪念"
+          ]
+        },
+        {
+          "name": "玄武湖",
+          "district": "玄武区",
+          "lat": 32.07,
+          "lng": 118.798,
+          "visit_minutes": 120,
+          "heat": 85,
+          "must_visit": false,
+          "intro": "环湖 10 km，可从解放门上城墙俯瞰湖面。",
+          "tags": [
+            "公园",
+            "自然"
+          ]
+        },
+        {
+          "name": "鸡鸣寺",
+          "district": "玄武区",
+          "lat": 32.056,
+          "lng": 118.792,
+          "visit_minutes": 60,
+          "heat": 84,
+          "must_visit": false,
+          "intro": "3 月底樱花大道最盛，寺内素面值得吃。",
+          "tags": [
+            "宗教",
+            "赏花"
+          ]
+        },
+        {
+          "name": "老门东",
+          "district": "秦淮区",
+          "lat": 32.017,
+          "lng": 118.784,
+          "visit_minutes": 90,
+          "heat": 86,
+          "must_visit": false,
+          "intro": "比夫子庙清净的老街，小吃与手作店为主。",
+          "tags": [
+            "街区",
+            "小吃"
+          ]
+        },
+        {
+          "name": "先锋书店(五台山店)",
+          "district": "鼓楼区",
+          "lat": 32.051,
+          "lng": 118.77,
+          "visit_minutes": 60,
+          "heat": 76,
+          "must_visit": false,
+          "intro": "由地下车库改造，斜坡与十字架是标志。",
+          "tags": [
+            "书店",
+            "文艺"
+          ]
+        },
+        {
+          "name": "颐和路公馆区",
+          "district": "鼓楼区",
+          "lat": 32.062,
+          "lng": 118.768,
+          "visit_minutes": 90,
+          "heat": 78,
+          "must_visit": false,
+          "intro": "民国公馆建筑群，梧桐大道适合骑车慢逛。",
+          "tags": [
+            "街区",
+            "建筑"
+          ]
+        },
+        {
+          "name": "雨花台",
+          "district": "雨花台区",
+          "lat": 32.0,
+          "lng": 118.77,
+          "visit_minutes": 120,
+          "heat": 79,
+          "must_visit": false,
+          "intro": "烈士陵园与风景区结合，园区大，绿化好。",
+          "tags": [
+            "红色",
+            "公园"
+          ]
+        },
+        {
+          "name": "中华门瓮城",
+          "district": "秦淮区",
+          "lat": 32.009,
+          "lng": 118.78,
+          "visit_minutes": 90,
+          "heat": 82,
+          "must_visit": false,
+          "intro": "现存最大的城堡式瓮城，可登城墙走到老门东。",
+          "tags": [
+            "历史",
+            "城墙"
+          ]
+        },
+        {
+          "name": "牛首山文化旅游区",
+          "district": "江宁区",
+          "lat": 31.9,
+          "lng": 118.74,
+          "visit_minutes": 240,
+          "heat": 83,
+          "must_visit": false,
+          "intro": "佛顶宫极震撼，距市区 40 分钟，需半天。",
+          "tags": [
+            "宗教",
+            "近郊"
+          ]
+        },
+        {
+          "name": "栖霞山",
+          "district": "栖霞区",
+          "lat": 32.154,
+          "lng": 118.96,
+          "visit_minutes": 180,
+          "heat": 80,
+          "must_visit": false,
+          "intro": "11 月中下旬红叶季，平日人少清静。",
+          "tags": [
+            "登山",
+            "赏叶"
+          ]
+        },
+        {
+          "name": "阅江楼",
+          "district": "鼓楼区",
+          "lat": 32.096,
+          "lng": 118.756,
+          "visit_minutes": 90,
+          "heat": 75,
+          "must_visit": false,
+          "intro": "狮子山上，可俯瞰长江大桥，与静海寺相邻。",
+          "tags": [
+            "登高",
+            "历史"
+          ]
+        },
+        {
+          "name": "南京长江大桥",
+          "district": "浦口区",
+          "lat": 32.11,
+          "lng": 118.74,
+          "visit_minutes": 60,
+          "heat": 74,
+          "must_visit": false,
+          "intro": "可步行或骑行过桥，桥头堡有展览馆。",
+          "tags": [
+            "地标"
+          ]
+        },
+        {
+          "name": "南京眼步行桥",
+          "district": "建邺区",
+          "lat": 32.008,
+          "lng": 118.73,
+          "visit_minutes": 60,
+          "heat": 77,
+          "must_visit": false,
+          "intro": "河西青奥轴线，夜景灯光好看，适合傍晚散步。",
+          "tags": [
+            "地标",
+            "夜景"
+          ]
+        },
+        {
+          "name": "1912街区",
+          "district": "玄武区",
+          "lat": 32.045,
+          "lng": 118.806,
+          "visit_minutes": 90,
+          "heat": 73,
+          "must_visit": false,
+          "intro": "总统府旁的民国风酒吧街，晚上才热闹。",
+          "tags": [
+            "夜生活",
+            "餐饮"
+          ]
+        },
+        {
+          "name": "汤山温泉",
+          "district": "江宁区",
+          "lat": 32.058,
+          "lng": 119.04,
+          "visit_minutes": 240,
+          "heat": 78,
+          "must_visit": false,
+          "intro": "距市区 40 分钟，秋冬泡汤首选，建议安排半天。",
+          "tags": [
+            "温泉",
+            "近郊"
+          ]
+        }
+      ]
+    }
+  ]
+}
