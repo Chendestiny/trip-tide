@@ -99,6 +99,13 @@
                   <span v-for="t in (a.tags || []).slice(0, 2)" :key="t" class="chip">{{ t }}</span>
                 </div>
               </div>
+              <span
+                v-if="a.spot_count"
+                class="att-more"
+                role="button"
+                title="查看内部点位与攻略"
+                @click.stop="openSpots(a)"
+              >›</span>
               <div :class="['tick', { on: isOn(a.id) }]">{{ isOn(a.id) ? '✓' : '' }}</div>
             </button>
 
@@ -212,6 +219,15 @@
         <div class="loading-bar"><i /></div>
         <p class="loading-note">先按地理顺路分天，再并行生成每天的安排，通常 15~30 秒</p>
       </div>
+
+      <!-- 景点详情 + 内部子景点（纯静态数据，不调 LLM） -->
+      <SpotSheet
+        :open="spotSheet.open"
+        :att="spotSheet.att"
+        :spots="spotSheet.spots"
+        :loading="spotSheet.loading"
+        @close="spotSheet.open = false"
+      />
     </PhoneShell>
   </div>
 </template>
@@ -220,7 +236,8 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PhoneShell from '../../components/trip/PhoneShell.vue'
-import { autoPlan, createPlan, getAttractions, previewPlan } from '../../trip-api'
+import SpotSheet from '../../components/trip/SpotSheet.vue'
+import { autoPlan, createPlan, getAttractions, getSpots, previewPlan } from '../../trip-api'
 import { commitPlan } from '../../trip-store'
 import { useIsWide } from '../../use-media'
 
@@ -230,6 +247,22 @@ const isWide = useIsWide()
 const city = computed(() => String(route.query.city || ''))
 
 const attractions = ref([])
+
+// ---------- 景点详情弹窗（内部子景点，纯静态数据） ----------
+const spotSheet = reactive({ open: false, att: null, spots: [], loading: false })
+async function openSpots(a) {
+  spotSheet.att = a
+  spotSheet.spots = []
+  spotSheet.loading = true
+  spotSheet.open = true
+  try {
+    spotSheet.spots = await getSpots(a.id)
+  } catch {
+    spotSheet.spots = []   // 拿不到就展示景点本身的信息，不打断
+  } finally {
+    spotSheet.loading = false
+  }
+}
 const selectedIds = ref([])
 const loading = ref(true)
 const error = ref('')
@@ -539,6 +572,20 @@ watch(city, load)
   box-shadow: 0 0 0 4px var(--brand-soft);
   transform: scale(1.06);
 }
+
+/* 景点详情入口（有子景点数据才显示） */
+.att-more {
+  flex-shrink: 0; align-self: center;
+  width: 24px; height: 24px; margin-left: -2px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 700; line-height: 1;
+  color: var(--ink-4);
+  transition: color 0.18s var(--ease), background 0.18s var(--ease), transform 0.18s var(--ease);
+  cursor: pointer;
+}
+.att:hover .att-more { color: var(--brand); background: var(--brand-soft); }
+.att-more:hover { transform: translateX(2px); }
 
 .sk {
   height: 110px; border-radius: var(--r-lg);

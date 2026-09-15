@@ -311,6 +311,7 @@ class AttractionOut(BaseModel):
     must_visit: bool = False
     best_time: str = Field("", description="最佳时段 morning/night/museum，空=无约束")
     tags: list[str] = Field(default_factory=list)
+    spot_count: int = Field(0, description="内部子景点数；>0 时前端显示详情入口")
 
 
 class PlanResponse(BaseModel):

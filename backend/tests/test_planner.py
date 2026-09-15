@@ -68,9 +68,10 @@ class TestGrade(unittest.TestCase):
 
 class TestIsMust(unittest.TestCase):
     def test_must_visit_or_high_heat(self):
+        # MUST_HEAT=500：全国 T 级 ≥500（T0/T1）视为必去
         self.assertTrue(planner._is_must(make_att(1, "a", must=True, heat=10)))
-        self.assertTrue(planner._is_must(make_att(2, "b", must=False, heat=90)))
-        self.assertFalse(planner._is_must(make_att(3, "c", must=False, heat=89)))
+        self.assertTrue(planner._is_must(make_att(2, "b", must=False, heat=560)))
+        self.assertFalse(planner._is_must(make_att(3, "c", must=False, heat=499)))
 
     def test_missing_and_falsy_fields(self):
         self.assertFalse(planner._is_must(SimpleNamespace(name="x", must_visit=False, heat=None)))

@@ -50,6 +50,9 @@ export const getCities = () => request('/cities')
 /** 某城市的景点池（后端已按 heat 降序返回） */
 export const getAttractions = (city) => request(`/attractions?city=${encodeURIComponent(city)}`)
 
+/** 某景点的内部子景点（名称/顺序/停留/攻略，纯静态数据，不调 LLM） */
+export const getSpots = (id) => request(`/attractions/${id}/spots`)
+
 /** 紧凑度预估：纯硬编码、毫秒级、不调 LLM。选景点时实时调用 */
 export const previewPlan = (payload) =>
   request('/preview', { method: 'POST', body: payload, timeout: 12000 })

@@ -359,6 +359,12 @@ def rule_violations(day_plan: DayPlan, by_id: dict[int, Any]) -> list[str]:
 
 
 # ================================================================ ① 容量裁剪
+# 「必去」的热度线：全国 T 级 ≥500（T0 世界级 / T1 全国顶流）直接视为必去。
+# 热度是**全国统一尺度**（0~1000），不是城市内相对值——故宫/长城可以到 800+，
+# 同城比较时单调性不变，所以排序/性价比逻辑不受尺度影响。
+MUST_HEAT = 500
+
+
 def _cost(city: Any, item: Any, transport: str) -> int:
     """粗估某个景点要吃掉多少时间：游览 + 从市中心往返的路程。"""
     return int(item.visit_minutes + 2 * travel_from(city, item, transport))
@@ -366,7 +372,9 @@ def _cost(city: Any, item: Any, transport: str) -> int:
 
 def _is_must(item: Any) -> bool:
     """「必去」判定——与 materialize_day 里写 must_visit 的口径保持一致。"""
-    return bool(getattr(item, "must_visit", False)) or (getattr(item, "heat", 0) or 0) >= 90
+    return bool(getattr(item, "must_visit", False)) or (
+        getattr(item, "heat", 0) or 0
+    ) >= MUST_HEAT
 
 
 def _value(city: Any, item: Any, transport: str) -> float:
@@ -1053,7 +1061,7 @@ def materialize_day(
                 stay_minutes=stay,
                 travel_minutes=travel,
                 travel_mode="步行" if resumed else mode,
-                must_visit=bool(item.must_visit) or item.heat >= 90,
+                must_visit=_is_must(item),
                 moved_to_day=day_index if moved else None,
                 moved_from_day=moved["from_day"] if moved else None,
                 move_reason=moved["reason"] if moved else "",

@@ -134,7 +134,7 @@ def _day_user_prompt(
     ]
     for a in items:
         flags = []
-        if a.must_visit or a.heat >= 90:
+        if planner._is_must(a):
             flags.append("必去")
         lines.append(
             f"  id={a.id} {a.name}｜{a.district or '—'}｜热度 {a.heat}｜"

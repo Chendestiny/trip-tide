@@ -22,11 +22,11 @@ import logging
 from datetime import datetime
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.trip import llm, planner, tools
-from app.trip.models import Attraction, City, TripPlan
+from app.trip.models import Attraction, City, Spot, TripPlan
 from app.trip.schemas import (
     AttractionOut,
     AutoPlanRequest,
@@ -79,7 +79,22 @@ def list_attractions(db: Session, city_key: str) -> list[AttractionOut]:
         .where(Attraction.city_id == city.id)
         .order_by(Attraction.heat.desc(), Attraction.visit_minutes.desc())
     ).all()
-    return [AttractionOut.model_validate(r) for r in rows]
+    # 一条 group by 拿全部子景点数，避免 N+1；>0 时前端显示「详情」入口
+    counts: dict[int, int] = {}
+    if rows:
+        counts = dict(
+            db.execute(
+                select(Spot.attraction_id, func.count())
+                .where(Spot.attraction_id.in_([r.id for r in rows]))
+                .group_by(Spot.attraction_id)
+            ).all()
+        )
+    out = []
+    for r in rows:
+        item = AttractionOut.model_validate(r)
+        item.spot_count = counts.get(r.id, 0)
+        out.append(item)
+    return out
 
 
 def list_spots(db: Session, attraction_id: int) -> list[SpotOut]:
