@@ -77,6 +77,38 @@ Base：`/api/trip`（dev 下由 Vite 把 `/api` 代理到 `127.0.0.1:8000`）
 
 ---
 
+## 2.1 GET /api/trip/attractions/{attraction_id}/spots
+
+**某景点内部的子景点**（坐标 + 攻略）。数据在 seed 阶段预存（`trip_spot` 表）——
+景点内部路线这类信息 2~3 年不变，不该每次规划都让模型现写。
+
+做成**单独接口**而不是塞进 `AttractionOut`：景点列表页用不到它，
+带上会让响应体积翻几倍（20 景点 × 4 子景点）。
+
+```json
+[
+  {
+    "id": 31,
+    "name": "安澜索桥",
+    "lat": 31.0034,
+    "lng": 103.6161,
+    "guide": "走桥时靠内侧，晃得轻一些；桥上人多时别停步拍照，容易被后面的人推着走。",
+    "order_index": 3,
+    "stay_minutes": 20
+  }
+]
+```
+
+| 字段 | 说明 |
+|---|---|
+| `lat` / `lng` | **可能为 `null`** —— 高德对小众子景点常搜不到，这时只保留攻略文字 |
+| `order_index` | 建议游览顺序（从 1 开始） |
+| `stay_minutes` | 建议停留分钟；`0` 表示未标注 |
+
+**错误**：404 —— 景点不存在。
+
+---
+
 ## 3. POST /api/trip/preview
 
 **紧凑度预估，不调 LLM，毫秒级返回。** 选景点时实时调用（前端防抖 350ms），
@@ -228,6 +260,63 @@ ratio ≥ 0.65 → 适中    否则        → 轻松
 > 只有「降级也失败」（例如数据库写不进去）才会报 500。
 >
 > 耗时参考：4 天 10 个景点实测 **17.7 秒**（4 路并行）。旧的 function calling 工具编排方案要 1.1 分钟。
+
+---
+
+## 4.1 POST /api/trip/auto-plan
+
+**一键 AI**：只给城市 + 天数 + 节奏，景点由服务端自动挑。
+
+与 `POST /plan` 的**唯一区别**是不需要传 `attraction_ids`。内部流程是：
+
+```
+planner.pick_attractions()   必去优先 → 热度其次，累计游览时长逼近「天数 × 节奏目标」
+        ↓
+转成普通 PlanRequest → 调用**同一个** service.generate_plan()
+```
+
+所以返回结构、`source` 标记、降级行为与 `/plan` **完全一致**；实际选中的景点会回填进
+`request.attraction_ids`，前端和历史记录都能看到「AI 挑了哪些」。
+
+**请求体**
+
+```json
+{
+  "city": "成都",
+  "days": 4,
+  "pace": "balanced",
+  "transport": "mixed",
+  "start_time": "09:00",
+  "return_time": "19:30"
+}
+```
+
+| 字段 | 类型 | 约束 |
+|---|---|---|
+| `city` | string | 必填 |
+| `days` | int | **必填**，1~7（默认 2） |
+| `pace` | string | **必填**，`relaxed` / `balanced` / `packed`（默认 `balanced`） |
+| `transport` | string | `drive` / `mixed` / `transit`，默认 `mixed` |
+| `start_time` / `return_time` | string | `HH:MM`，默认 `09:00` / `19:30` |
+| `first_day_start_time` / `last_day_return_time` | string \| null | 同 `/plan` |
+
+**响应**：与 `POST /plan` 完全相同。
+
+**实测挑选结果**（成都 20 个景点）：
+
+| 天数 / 节奏 | 选中 | 游览合计（目标） |
+|---|---|---|
+| 2 天 平衡 | 7 个 | 750（720） |
+| 4 天 轻松 | 8 个 | 990（960） |
+| 4 天 平衡 | 14 个 | 1560（1440） |
+| 6 天 平衡 | 20 个 | 2265（2160） |
+
+**错误**
+
+| 状态码 | 场景 |
+|---|---|
+| 400 | 城市不存在，或该城市还没有景点数据（先跑 seed） |
+| 500 | 生成失败（同 `/plan`） |
 
 ---
 

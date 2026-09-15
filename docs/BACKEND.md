@@ -1,6 +1,11 @@
 # 后端地图
 
-> 符号级导航。**所有行号基于当前代码**，如果对不上说明代码变了——以代码为准，顺手改这份文档。
+> 符号级导航。**行号会随改动漂移 —— 查找代码请以函数名为准**，顺手改这份文档。
+>
+> ⚠️ **2026-09-15 有一次大改**（分天模型 v2 / 弹性时长 / 一键 AI / `best_time` / `trip_spot` 子表 /
+> LLM 分天审阅），本文件里的部分行号与细节可能滞后。
+> 想知道「为什么现在长这样」先看 [`CHANGELOG.md`](CHANGELOG.md)。
+>
 > 需要先建立全局认知请看 [`README.md`](README.md)；要改代码前请先读 [`../AGENTS.md`](../AGENTS.md) 的铁律。
 
 ---
@@ -17,7 +22,7 @@ backend/
     │   ├── db.py             引擎 / 会话 / 建表 / MySQL 自动建库
     │   └── _llm/             LLM 私有包（`_` 前缀 = 私有实现）
     └── trip/                 业务包
-        ├── models.py         3 张表
+        ├── models.py         4 张表
         ├── schemas.py        请求/响应 + LLM 输出契约
         ├── routers.py        7 条 HTTP 路由
         ├── service.py        业务编排
@@ -147,9 +152,9 @@ LLM 返回不可靠，四步兜底：剥 ```` ```json ```` 围栏 → `find("{")
 
 ## `trip/` 业务层
 
-### `models.py`（109 行）— 3 张表
+### `models.py` — 4 张表
 
-三张表全部 `trip_` 前缀，与同库的 my-website 表互不干扰。**经纬度全库统一 GCJ-02。**
+四张表全部 `trip_` 前缀，与同库的 my-website 表互不干扰。**经纬度全库统一 GCJ-02。**
 
 #### `trip_city` → `City`(34)
 
@@ -259,7 +264,7 @@ LLM 返回不可靠，四步兜底：剥 ```` ```json ```` 围栏 → `find("{")
 
 ---
 
-### `routers.py`（121 行）— 7 条路由
+### `routers.py` — 9 条路由
 
 挂载前缀 `/api/trip`（`main.py:49`）。`MAX_ATTRACTIONS = 40`(37)，`_guard()`(40) 超限直接 `HTTPException(400)`。
 

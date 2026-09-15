@@ -30,14 +30,19 @@
 
 ```
 ① 硬编码分天        瞬时、确定、不花钱、可回归测试
-   prune_to_capacity → assign_days → plan_hotels
-   地理顺路 + 容量裁剪 + 时段硬知识（熊猫基地排上午）都在这里生效
+   大景点/远郊独占一天 → 其余按直线距离聚成「片区簇」→ 簇分配到天
+   地理顺路 + 容量裁剪 + 时段硬知识都在这里生效
+   ✅ 片区簇是原子、不可拆 —— 紧邻景点必然同日（锦里↔武侯祠 0.24km 就是这条保住的）
+
+①.5 LLM 审阅分天   把**量化通行时间矩阵**给模型提调整建议
+                   输出过 5 道硬校验才采纳；不过就沿用 ① 的结果（纯增益，无新增失败面）
 
 ② LLM 并行写内容    每天一路，ThreadPoolExecutor 并发（MAX_WORKERS=4）
    每路只产出：当天主题 + 各景点建议 + 餐饮区域与本地特色
 
 ③ 硬编码物化        瞬时、确定
    materialize_day  ← 全项目唯一产出时间的地方
+   含弹性游玩时长填空、跨午饭拆分、目标返回时间的硬约束
 
 ④ LLM 终检          读最终时间轴，提意见 + 润色总述
 ```
@@ -110,12 +115,17 @@
 |---|---|---|
 | **基线 / baseline** | 硬编码规则引擎产出的完整方案。**每次请求都先算它**——有 Key 时它是参考实现，没 Key 时它就是最终答案 | `planner.plan_fallback()` |
 | **物化 / materialize** | 把「景点顺序 + 大纲文案」变成带具体时间的节点序列 | `planner.materialize_day()` |
-| **紧凑度 / tightness** | 选景点阶段的实时预估：`轻松 / 适中 / 紧凑 / 超载` 四档 | `service.preview_plan()` |
-| **节奏倾向 / pace** | `relaxed / balanced / packed` 三选，影响容量系数（0.82 / 1.0 / 1.15） | `planner.PACE_FACTOR` |
+| **紧凑度 / tightness** | 选景点阶段的实时预估：`轻松 / 适中 / 紧凑 / 超载`。判定靠**日均游览量 vs 节奏目标**，不是时间占用率 | `service.preview_plan()` |
+| **节奏倾向 / pace** | `relaxed / balanced / packed` 三选。决定「每天目标游玩时长」（240 / 360 / 450 分钟）与弹性填充强度。**不影响时间预算** —— 出发/返回是硬约束 | `planner.PACE_TARGET_MINUTES`、`PACE_FLEX` |
 | **出行方式 / transport** | `drive / mixed / transit` 三选（历史值 `taxi` ≡ `mixed`），按距离自动挑具体交通工具 | `planner.leg()` |
 | **微调 / tweak** | 复用原分天、只重排时间轴，秒级、不花 token，**生成一条新记录** | `service.adjust_plan()` |
+| **一键 AI / auto-plan** | 只给城市 + 天数 + 节奏，服务端自动挑景点，再走**同一条**生成链路 | `service.generate_auto_plan()` |
 | **降级 / fallback** | 无 Key 或流水线失败时切规则引擎，**不静默**：`source=fallback` + summary 注明原因 + 前端打标签 | `service.generate_plan()` |
 | **独占型景点** | 游览 ≥4h 或单程 ≥45min，各自占一整天（否则远郊会把市区线挤崩） | `planner._is_standalone()` |
+| **片区簇 / cluster** | 按**直线距离**（≤1200m）把相邻景点聚成的一组，**分天时不可拆** | `planner.cluster_attractions()` |
+| **弹性填充 / flex** | 景点排得少时把余量还给景点本身：`clamp(可用×r, 基础, 基础×m)`，r/m 按节奏取；大景点与远郊不受限 | `planner._flex_scale()` |
+| **严格返回 / strict_return** | 只有「最后一天 **且** 用户显式设了返回时间」才硬卡点（意味着赶高铁/飞机）；中间几天允许小幅超时并给提示 | `planner.materialize_day()` |
+| **需要天数 / days_needed** | 「按片区排最舒服要几天」= 独占型个数 + 簇数。**仅作提示，不参与判定**（天数不够时簇会合并） | `planner.estimate_days_needed()` |
 | **GCJ-02** | 火星坐标系。全库统一，混坐标系会整体偏移几百米且**不报错** | `Attraction.coord_source` 可追溯 |
 
 ---
@@ -147,12 +157,16 @@
 | 文档 | 讲什么 | 什么时候读 |
 |---|---|---|
 | **本页** `README.md` | 索引、速览、目录地图、关键概念 | 第一步 |
+| [`CHANGELOG.md`](CHANGELOG.md) | **按日期记录影响架构的改动**（含每次踩坑的原因与解法） | 想知道「为什么现在是这样」 |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | 分层与设计取舍：为什么这么切、交通模型、紧凑度、踩过的坑 | 想改架构前 |
-| [`BACKEND.md`](BACKEND.md) | 后端符号级地图：每个文件导出什么、函数在多少行、三张表结构 | 改后端前 |
+| [`BACKEND.md`](BACKEND.md) | 后端符号级地图：每个文件导出什么、**四张表**结构 | 改后端前 |
 | [`FRONTEND.md`](FRONTEND.md) | 前端符号级地图：路由、组件、状态、设计系统变量表、响应式 | 改前端前 |
-| [`API.md`](API.md) | 7 个 HTTP 接口的契约与错误码 | 对接口时 |
+| [`API.md`](API.md) | **9 个** HTTP 接口的契约、错误码、紧凑度阈值推导 | 对接口时 |
 | [`PLAN_SCHEMA.md`](PLAN_SCHEMA.md) | 时间轴数据结构 `PlanResult` 全字段说明 | 改数据结构和前端渲染前 |
-| [`DEVELOPMENT.md`](DEVELOPMENT.md) | 环境搭建、常用命令、回归测试、排查表 | 准备跑起来时 |
+| [`DEVELOPMENT.md`](DEVELOPMENT.md) | 环境搭建、常用命令、测试、排查表 | 准备跑起来时 |
+| [`testing-prompt.md`](testing-prompt.md) | **交给其他模型写单元测试用的提示词**（自包含，可整段复制） | 需要补测试时 |
 | `screenshots/` | 界面截图 | 了解成品长相 |
+
+> **找代码请用函数名，别用行号** —— 行号每次改代码都会漂移。
 
 根目录两份：[`../README.md`](../README.md)（面向人）、[`../AGENTS.md`](../AGENTS.md)（面向 AI agent 的操作手册与铁律）。

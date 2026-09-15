@@ -109,9 +109,27 @@ npm run seed       # 等价于 backend 里的初始化
 
 ---
 
-## 回归测试
+## 测试
 
-### 后端：`scripts/check_planner.py`
+### 纯函数单元测试：`backend/tests/test_planner.py`
+
+**不连数据库、不调 LLM、不起服务**，毫秒级跑完。覆盖：景点分级 / 用餐时长 /
+时间预算 / 时段规则 / 地理聚类 / 一键挑景点 / LLM 分天的硬校验。
+（其中好几条是回归用的 —— 比如「时间预算不随 pace 变化」「紧邻景点拆到两天要报错」。）
+
+```bash
+cd backend && venv/Scripts/python tests/test_planner.py
+# 或
+cd backend && venv/Scripts/python -m unittest tests.test_planner -v
+```
+
+改 `planner.py` / `llm.py` 的纯逻辑后**先跑它** —— 比下面的回归脚本快得多，
+也不依赖数据库。
+
+> 想扩充测试可以看 [`testing-prompt.md`](testing-prompt.md)：那份提示词是自包含的
+> （含项目背景、被测函数语义、必须覆盖的场景、约束），可以直接交给另一个模型。
+
+### 后端回归：`scripts/check_planner.py`
 
 **不启服务**，直接调 `planner.plan_fallback()` 跑 8 个用例，逐节点校验 6 项。
 
@@ -207,6 +225,10 @@ LLM 流水线失败，降级到规则引擎：...            # 整体降级
 ## 待办与建议
 
 按性价比排序，**都不影响当前运行**，但会误导接手的人。
+
+> **2026-09-15 大改之后新增的遗留项**（子景点 `guide` 接入规划、高德定稿校准、
+> `check_planner.py` 覆盖不足等）记在 [`CHANGELOG.md`](CHANGELOG.md) 的「已知遗留」一节。
+> 本页列的是更早的那批，其中已修的不再重复。
 
 ### 高优先：会直接误导的
 
