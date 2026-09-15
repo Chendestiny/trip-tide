@@ -221,7 +221,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PhoneShell from '../../components/trip/PhoneShell.vue'
 import { autoPlan, createPlan, getAttractions, previewPlan } from '../../trip-api'
-import { commitPlan, loadPref, savePref } from '../../trip-store'
+import { commitPlan } from '../../trip-store'
 import { useIsWide } from '../../use-media'
 
 const route = useRoute()
@@ -334,14 +334,11 @@ async function load() {
   error.value = ''
   try {
     attractions.value = await getAttractions(city.value)
-    // 恢复上次的勾选与设置，二次规划不用重来
-    const saved = loadPref(city.value)
-    if (saved) {
-      Object.assign(pref, saved.pref || {})
-      selectedIds.value = (saved.selectedIds || []).filter((id) =>
-        attractions.value.some((a) => a.id === id)
-      )
-    }
+    // 不记忆上次勾选：每次进页面都是干净状态。
+    // 只保留必要的一步清理——换城市后旧 id 不再有效，直接剔除。
+    selectedIds.value = selectedIds.value.filter((id) =>
+      attractions.value.some((a) => a.id === id)
+    )
   } catch (e) {
     error.value = e.message
   } finally {
@@ -400,13 +397,11 @@ async function runPlan(call) {
 /** 详细规划：带着勾选的景点去生成 */
 async function startPlan() {
   if (!selectedIds.value.length) return
-  savePref(city.value, { pref: { ...pref }, selectedIds: [...selectedIds.value] })
   await runPlan(() => createPlan(buildPayload()))
 }
 
 /** 一键 AI：不传景点，由服务端按天数和节奏自动挑选 */
 async function startAuto() {
-  savePref(city.value, { pref: { ...pref }, selectedIds: [...selectedIds.value] })
   await runPlan(() =>
     autoPlan({
       city: city.value,

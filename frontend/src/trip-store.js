@@ -77,20 +77,6 @@ export function historyBriefs() {
   }))
 }
 
-/** 记住上次的勾选与设置，二次规划不用重来 */
-const PREF_KEY = 'triptide.pref.v1'
-
-export function savePref(city, pref) {
-  try {
-    localStorage.setItem(PREF_KEY, JSON.stringify({ city, pref }))
-  } catch { /* ignore */ }
-}
-
-export function loadPref(city) {
-  try {
-    const raw = JSON.parse(localStorage.getItem(PREF_KEY) || 'null')
-    return raw && raw.city === city ? raw.pref : null
-  } catch {
-    return null
-  }
-}
+// 注：原 savePref / loadPref（localStorage 的 triptide.pref.v1）已移除。
+// 需求变更：进景点池不再恢复上次的勾选与设置，每次都是干净状态；
+// 天数、节奏等在页面内仍然可用，只是不跨会话记住。
