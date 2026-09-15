@@ -39,6 +39,7 @@ from app.trip.schemas import (
     PlanResponse,
     PlanResult,
     PlanReview,
+    SpotOut,
 )
 
 logger = logging.getLogger("triptide.service")
@@ -79,6 +80,18 @@ def list_attractions(db: Session, city_key: str) -> list[AttractionOut]:
         .order_by(Attraction.heat.desc(), Attraction.visit_minutes.desc())
     ).all()
     return [AttractionOut.model_validate(r) for r in rows]
+
+
+def list_spots(db: Session, attraction_id: int) -> list[SpotOut]:
+    """某景点的内部子景点（坐标 + 攻略）。
+
+    单独一个接口而不是塞进 `AttractionOut`：景点列表页用不到它，
+    带上会让响应体积翻好几倍；只有展开某个景点详情时才取。
+    """
+    att = db.get(Attraction, attraction_id)
+    if att is None:
+        raise HTTPException(status_code=404, detail=f"景点 {attraction_id} 不存在")
+    return [SpotOut.model_validate(s) for s in att.spots]
 
 
 def _all_of_city(db: Session, city: City) -> list[Attraction]:

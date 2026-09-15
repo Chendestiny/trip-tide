@@ -29,6 +29,7 @@ from app.trip.schemas import (
     PlanPreview,
     PlanRequest,
     PlanResponse,
+    SpotOut,
 )
 
 logger = logging.getLogger("triptide.routers")
@@ -57,6 +58,20 @@ def get_attractions(
     db: Session = Depends(get_db),
 ) -> list[AttractionOut]:
     return service.list_attractions(db, city)
+
+
+@router.get(
+    "/attractions/{attraction_id}/spots",
+    response_model=list[SpotOut],
+    summary="某景点的内部子景点（坐标 + 攻略）",
+)
+def get_spots(attraction_id: int, db: Session = Depends(get_db)) -> list[SpotOut]:
+    """景点内部的主要点位：坐标（高德搜不到时为空）+ 怎么玩 / 注意什么。
+
+    数据是 seed 阶段预存的（`trip_spot` 表）—— 这类信息 2~3 年不变，
+    不该每次规划都让模型现写。单独一个接口是为了不让景点列表响应变肥。
+    """
+    return service.list_spots(db, attraction_id)
 
 
 @router.post("/preview", response_model=PlanPreview, summary="紧凑度预估（不调 LLM）")

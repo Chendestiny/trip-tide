@@ -283,6 +283,20 @@ class CityOut(BaseModel):
     attraction_count: int = 0
 
 
+class SpotOut(BaseModel):
+    """景点内部的子景点（坐标 + 攻略）。`lat/lng` 可为空——高德搜不到时只留文字。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    lat: float | None = None
+    lng: float | None = None
+    guide: str = ""
+    order_index: int = 0
+    stay_minutes: int = 0
+
+
 class AttractionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

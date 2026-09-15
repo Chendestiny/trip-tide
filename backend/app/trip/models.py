@@ -1,7 +1,8 @@
-"""ORM 模型：三张表。
+"""ORM 模型：四张表。
 
 trip_city        —— 预置热门城市
 trip_attraction  —— 景点池（坐标统一 GCJ-02）
+trip_spot        —— 景点内部的子景点（坐标 + 攻略），把「2~3 年不变」的内部路线知识预存下来
 trip_plan        —— 规划快照（入参 + 出参整体 JSON 存档，V1 不做关系化）
 
 坐标说明：全库统一 GCJ-02（火星坐标系）。
@@ -90,6 +91,47 @@ class Attraction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     city: Mapped[City] = relationship(back_populates="attractions")
+    spots: Mapped[list["Spot"]] = relationship(
+        back_populates="attraction",
+        cascade="all, delete-orphan",
+        order_by="Spot.order_index",
+    )
+
+
+class Spot(Base):
+    """景点内部的子景点（如都江堰景区里的「安澜索桥」「宝瓶口」）。
+
+    存在的意义：**把「内部路线攻略」这类 2~3 年不变的知识预存下来**，
+    规划时直接读，不必每次让 LLM 现写 —— 既省 token，又让文案稳定、可人工校对。
+
+    `lat` / `lng` 允许为空：高德有时搜不到小众子景点，这时仍保留攻略文字。
+    """
+
+    __tablename__ = "trip_spot"
+    __table_args__ = (
+        UniqueConstraint("attraction_id", "name"),
+        Index("ix_spot_attraction_order", "attraction_id", "order_index"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    attraction_id: Mapped[int] = mapped_column(
+        ForeignKey("trip_attraction.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    lat: Mapped[float | None] = mapped_column(
+        Float, nullable=True, comment="GCJ-02 纬度；高德搜不到时为空"
+    )
+    lng: Mapped[float | None] = mapped_column(Float, nullable=True, comment="GCJ-02 经度")
+    guide: Mapped[str] = mapped_column(Text, default="", comment="攻略 / 注意事项")
+    order_index: Mapped[int] = mapped_column(
+        Integer, default=0, comment="建议游览顺序，从 1 开始"
+    )
+    stay_minutes: Mapped[int] = mapped_column(
+        Integer, default=0, comment="建议停留分钟；0=未标注"
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    attraction: Mapped[Attraction] = relationship(back_populates="spots")
 
 
 class TripPlan(Base):

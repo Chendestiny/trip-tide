@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.db import SessionLocal, init_db
 from app.trip import llm
-from app.trip.models import Attraction, City
+from app.trip.models import Attraction, City, Spot
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)-7s | %(message)s", datefmt="%H:%M:%S"
@@ -43,7 +43,7 @@ LIST_SYSTEM = """你是旅游数据编辑。只输出 JSON，不要任何解释�
 LIST_USER = """请为「{city}」列出 {n} 个最值得去的景点，按外地游客视角排序。
 
 输出 JSON（字段名必须完全一致）：
-{{"attractions":[{{"name":"景点官方常用名","district":"所在区，如 青羊区","intro":"一句话简介","visit_minutes":90,"heat":90,"must_visit":false,"best_time":"","tags":["历史"]}}]}}
+{{"attractions":[{{"name":"景点官方常用名","district":"所在区，如 青羊区","intro":"一句话简介","visit_minutes":90,"heat":90,"must_visit":false,"best_time":"","tags":["历史"],"spots":[{{"name":"内部子景点名","guide":"这个点位怎么玩 / 要注意什么，20~60 字","stay_minutes":30}}]}}]}}
 
 要求：
 - name 必须是地图上能直接检索到的官方名称，不要用昵称（写「大熊猫繁育研究基地」而不是「熊猫基地」）
@@ -56,6 +56,12 @@ LIST_USER = """请为「{city}」列出 {n} 个最值得去的景点，按外地
   · "night"   夜景 / 夜游 / 酒吧街，要等亮灯（江边夜景、不夜城、灯光秀）
   · "museum"  博物馆 / 美术馆 / 纪念馆，闭馆早
   · ""        没有时段要求（绝大多数景点都是这个）
+- **spots 是景点内部的主要点位**，按建议游览顺序排 3~6 个：
+  · 大景区（都江堰、故宫、西湖这类）必填；单点式小景点（一家书店、一座塔）给空数组 []
+  · guide 要写「**怎么玩**」而不是「是什么」：从哪个门进最顺、几点人流少、要不要排队、
+    哪个机位出片、有什么坑（价格虚高 / 要提前买票），20~60 字
+  · 不要编造不存在的小众点位；拿不准就少写几个
+  · **不要写坐标** —— 坐标由地图接口补，你写的也不准
 - 类型要混合：地标 / 历史古迹 / 博物馆 / 自然公园 / 商圈文创 / 美食街区，
   其中近郊景点（车程 1 小时以上）最多 3 个
 只输出 JSON。"""
@@ -115,6 +121,52 @@ def upsert_city(db: Session, payload: dict) -> City:
     return city
 
 
+def _fill_spot_coords(city_name: str, att_name: str, spots: list[dict]) -> int:
+    """给子景点补 GCJ-02 坐标（高德文本搜索），返回补到的个数。
+
+    提示词里明确不让模型写坐标 —— 它报的坐标不可信，统一在这里补。
+    搜不到的（小众点位）就留空，攻略文字仍然保留。
+    """
+    got = 0
+    for s in spots:
+        spot_name = str(s.get("name") or "").strip()
+        if not spot_name:
+            continue
+        hit = search_poi(f"{att_name}{spot_name}", city_name)
+        time.sleep(AMAP_SLEEP)
+        if hit:
+            s["lat"], s["lng"] = hit[0], hit[1]
+            got += 1
+    return got
+
+
+def upsert_spots(db: Session, attraction: Attraction, spots: list[dict]) -> int:
+    """写入某景点的子景点（按 name 去重更新）。坐标缺失时保留旧值。"""
+    written = 0
+    for idx, s in enumerate(spots, start=1):
+        spot_name = str(s.get("name") or "").strip()
+        if not spot_name:
+            continue
+        row = db.scalar(
+            select(Spot).where(
+                Spot.attraction_id == attraction.id, Spot.name == spot_name
+            )
+        )
+        if row is None:
+            row = Spot(attraction_id=attraction.id, name=spot_name)
+            db.add(row)
+
+        row.guide = str(s.get("guide") or row.guide or "")[:1000]
+        row.order_index = int(s.get("order_index") or idx)
+        row.stay_minutes = int(s.get("stay_minutes") or row.stay_minutes or 0)
+        if s.get("lat") is not None and s.get("lng") is not None:
+            row.lat = float(s["lat"])
+            row.lng = float(s["lng"])
+        written += 1
+    db.flush()
+    return written
+
+
 def upsert_attractions(
     db: Session,
     city: City,
@@ -171,6 +223,14 @@ def upsert_attractions(
         row.tags = list(item.get("tags") or row.tags or [])
         row.coord_source = coord_source
         written += 1
+
+        # 子景点：模型只给名称 + 攻略，**坐标交给高德补**（它报的坐标不可信）
+        raw_spots = item.get("spots") or []
+        if raw_spots:
+            db.flush()  # 新建的景点要到这时才有 id
+            if use_amap:
+                _fill_spot_coords(city.name, name, raw_spots)
+            upsert_spots(db, row, raw_spots)
 
     db.flush()
     return written, calibrated
