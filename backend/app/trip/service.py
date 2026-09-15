@@ -29,6 +29,7 @@ from app.trip import llm, planner, tools
 from app.trip.models import Attraction, City, TripPlan
 from app.trip.schemas import (
     AttractionOut,
+    AutoPlanRequest,
     CityOut,
     DayPlan,
     DroppedItem,
@@ -80,7 +81,19 @@ def list_attractions(db: Session, city_key: str) -> list[AttractionOut]:
     return [AttractionOut.model_validate(r) for r in rows]
 
 
+def _all_of_city(db: Session, city: City) -> list[Attraction]:
+    """该城市的全部景点，按热度降序——「一键 AI」的候选池。"""
+    return list(
+        db.scalars(
+            select(Attraction)
+            .where(Attraction.city_id == city.id)
+            .order_by(Attraction.heat.desc(), Attraction.visit_minutes.desc())
+        ).all()
+    )
+
+
 def _load_selected(db: Session, city: City, ids: list[int]) -> list[Attraction]:
+    """按 id 取景点，校验是否都属于该城市。"""
     rows = db.scalars(
         select(Attraction).where(Attraction.city_id == city.id, Attraction.id.in_(ids))
     ).all()
@@ -279,6 +292,39 @@ def generate_plan(db: Session, req: PlanRequest) -> PlanResponse:
         record.id, source, len(trace), len(review.issues) if review else 0,
     )
     return _to_response(record, attractions, review=review, trace=trace)
+
+
+def generate_auto_plan(db: Session, payload: AutoPlanRequest) -> PlanResponse:
+    """一键 AI：只给城市 + 天数 + 节奏，服务端自动挑景点，再复用 generate_plan。
+
+    挑景点原则与分天一致（必去优先、其次热度，累计游览时长逼近
+    `天数 × 节奏目标`）。挑完转成普通 PlanRequest 后走**同一条生成链路**，
+    所以「一键」与「勾选」产出的方案结构、来源标记、降级行为完全一致；
+    实际选中的景点回填进 `request.attraction_ids`，前端和历史记录都能看到。
+    """
+    city = resolve_city(db, payload.city)
+    pool = _all_of_city(db, city)
+    if not pool:
+        raise HTTPException(
+            status_code=400, detail=f"「{city.name}」还没有景点数据，先跑一次 seed"
+        )
+
+    picked = planner.pick_attractions(
+        city, pool, payload.days, payload.pace, payload.transport
+    )
+    preview_names = "、".join(a.name for a in picked[:5])
+    logger.info(
+        "一键 AI：%s %s 天 %s 节奏 → 自动挑选 %d 个景点（%s%s）",
+        city.name, payload.days, payload.pace, len(picked),
+        preview_names, "…" if len(picked) > 5 else "",
+    )
+
+    req = PlanRequest(
+        city=city.name,
+        attraction_ids=[a.id for a in picked],
+        **payload.model_dump(exclude={"city"}),
+    )
+    return generate_plan(db, req)
 
 
 # ================================================================ 倾向微调

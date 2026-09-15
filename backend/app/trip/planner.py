@@ -634,6 +634,40 @@ def assign_days(
     return [apply_time_rules(g) for g in groups]
 
 
+def pick_attractions(
+    city: Any,
+    attractions: Sequence[Any],
+    days: int,
+    pace: str = "balanced",
+    transport: str = "mixed",
+) -> list[Any]:
+    """一键 AI：按「天数 + 节奏」自动挑选景点，用户不必逐个勾选。
+
+    原则与分天保持一致——**必去优先，其次热度**，累计游览时长逼近
+    「天数 × 节奏目标游玩时长」，超出 10% 后收口。
+    选出来的集合照常交给 assign_days 做地理优先分天。
+    """
+    items = list(attractions)
+    if not items or days <= 0:
+        return []
+
+    target = days * PACE_TARGET_MINUTES.get(pace, PACE_TARGET_MINUTES["balanced"])
+    ordered = sorted(items, key=lambda a: (0 if getattr(a, "must_visit", False) else 1, -a.heat))
+
+    picked: list[Any] = []
+    acc = 0
+    for a in ordered:
+        if picked and acc + a.visit_minutes > target * 1.1:
+            break
+        # 独占型（大景点 / 远郊）一天只能放一个，超出天数就别再选了
+        if _is_standalone(city, a, transport) and len(picked) >= days:
+            continue
+        picked.append(a)
+        acc += a.visit_minutes
+
+    return picked or items[:1]
+
+
 # ================================================================ ④ 逐天裁剪
 def trim_day(
     city: Any, items: Sequence[Any], req: PlanRequest, per_day_budget: int

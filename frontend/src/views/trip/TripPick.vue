@@ -1,12 +1,67 @@
 <template>
   <!-- 单根节点：页面必须只有一个根元素，详见 App.vue 的说明 -->
   <div class="page-root">
-    <PhoneShell :title="city" sub="· 勾选想去的景点" back="/trip">
+    <PhoneShell :title="city" :sub="mode === 'auto' ? '· 一键生成' : '· 勾选想去的景点'" back="/trip">
       <template #right>
-        <button class="btn line sm" @click="toggleAll">{{ allSelected ? '清空' : '全选' }}</button>
+        <button v-if="mode === 'detail'" class="btn line sm" @click="toggleAll">
+          {{ allSelected ? '清空' : '全选' }}
+        </button>
       </template>
 
-      <div class="pick-layout">
+      <!-- 顶部模式切换：直接生成（一键 AI）/ 详细规划（逐个勾景点） -->
+      <div class="mode-tabs">
+        <button :class="['mode-tab', { on: mode === 'auto' }]" @click="mode = 'auto'">
+          直接生成
+        </button>
+        <button :class="['mode-tab', { on: mode === 'detail' }]" @click="mode = 'detail'">
+          详细规划
+        </button>
+      </div>
+
+      <!-- ① 直接生成：只要天数和节奏，景点交给 AI 挑 -->
+      <div v-if="mode === 'auto'" class="auto-wrap">
+        <div class="auto-card card">
+          <h3 class="auto-title">一键生成行程</h3>
+          <p class="auto-desc">
+            定好天数和节奏就行，AI 会按地理顺路自动挑景点，并排出每天的时间轴。
+          </p>
+
+          <div class="set-row">
+            <label>行程天数</label>
+            <div class="seg days">
+              <button
+                v-for="d in 7" :key="d"
+                :class="{ on: pref.days === d }"
+                @click="pref.days = d"
+              >{{ d }}</button>
+            </div>
+          </div>
+
+          <div class="set-row">
+            <label>节奏倾向</label>
+            <div class="seg">
+              <button
+                v-for="p in PACES" :key="p.key"
+                :class="{ on: pref.pace === p.key }"
+                :title="p.tip"
+                @click="pref.pace = p.key"
+              >{{ p.label }}</button>
+            </div>
+          </div>
+
+          <button class="btn lg auto-btn" :disabled="!!planning" @click="startAuto">
+            ✨ 一键生成行程
+          </button>
+
+          <p class="auto-note">
+            按「{{ PACE_LABEL_MAP[pref.pace] }}」节奏排 {{ pref.days }} 天，大约会挑
+            {{ autoEstimate }} 个景点（必去优先，其次热度）；实际选中的会显示在结果页。
+          </p>
+        </div>
+      </div>
+
+      <!-- ② 详细规划：逐个勾景点 + 完整设置 -->
+      <div v-else class="pick-layout">
         <!-- 左：景点列表 -->
         <div class="pick-main">
           <div class="pick-bar">
@@ -165,7 +220,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PhoneShell from '../../components/trip/PhoneShell.vue'
-import { createPlan, getAttractions, previewPlan } from '../../trip-api'
+import { autoPlan, createPlan, getAttractions, previewPlan } from '../../trip-api'
 import { commitPlan, loadPref, savePref } from '../../trip-store'
 import { useIsWide } from '../../use-media'
 
@@ -182,6 +237,8 @@ const planning = ref(false)
 const showSet = ref(false)
 const stepText = ref('')
 const preview = ref(null)
+/** 'auto' = 直接生成（一键 AI，只要天数和节奏）· 'detail' = 详细规划（逐个勾景点） */
+const mode = ref('detail')
 
 const PACES = [
   { key: 'relaxed', label: '宽松', tip: '每天少排一点，早点收工，会舍弃更多景点' },
@@ -225,6 +282,21 @@ const warn = computed(() => {
   if (!n) return '至少勾选 1 个景点'
   if (n < pref.days) return `勾了 ${n} 个景点却排 ${pref.days} 天，会有几天没内容`
   return ''
+})
+
+// ---------- 一键 AI：只要天数和节奏 ----------
+const PACE_LABEL_MAP = { relaxed: '宽松', balanced: '平衡', packed: '紧凑' }
+/** 与后端 planner.PACE_TARGET_MINUTES 对齐：每天的节奏目标游玩分钟数 */
+const PACE_TARGET = { relaxed: 240, balanced: 360, packed: 450 }
+
+/** 按节奏目标粗估会挑中几个（纯展示，实际以服务端为准） */
+const autoEstimate = computed(() => {
+  const pool = attractions.value
+  if (!pool.length) return '若干'
+  const target = pref.days * (PACE_TARGET[pref.pace] || 360)
+  const avg =
+    pool.reduce((s, a) => s + (a.visit_minutes || 90), 0) / pool.length
+  return Math.max(1, Math.min(pool.length, Math.round(target / Math.max(30, avg))))
 })
 
 /** 提交给后端的完整参数 */
@@ -303,8 +375,8 @@ watch(
   { deep: true }
 )
 
-async function startPlan() {
-  if (!selectedIds.value.length) return
+/** 两种模式共用的「跑规划 + loading 文案轮换 + 跳结果页」 */
+async function runPlan(call) {
   planning.value = true
   let i = 0
   stepText.value = STEPS[0]
@@ -314,9 +386,7 @@ async function startPlan() {
   }, 3400)
 
   try {
-    const payload = buildPayload()
-    savePref(city.value, { pref: { ...pref }, selectedIds: [...selectedIds.value] })
-    const plan = await createPlan(payload)
+    const plan = await call()
     commitPlan(plan)
     router.push({ path: '/trip/plan', query: { planId: String(plan.plan_id) } })
   } catch (e) {
@@ -327,11 +397,71 @@ async function startPlan() {
   }
 }
 
+/** 详细规划：带着勾选的景点去生成 */
+async function startPlan() {
+  if (!selectedIds.value.length) return
+  savePref(city.value, { pref: { ...pref }, selectedIds: [...selectedIds.value] })
+  await runPlan(() => createPlan(buildPayload()))
+}
+
+/** 一键 AI：不传景点，由服务端按天数和节奏自动挑选 */
+async function startAuto() {
+  savePref(city.value, { pref: { ...pref }, selectedIds: [...selectedIds.value] })
+  await runPlan(() =>
+    autoPlan({
+      city: city.value,
+      days: pref.days,
+      pace: pref.pace,
+      transport: pref.transport,
+      start_time: pref.startTime,
+      return_time: pref.returnTime,
+      first_day_start_time: pref.customEnds ? pref.firstDayStart : null,
+      last_day_return_time: pref.customEnds ? pref.lastDayReturn : null,
+    })
+  )
+}
+
 onMounted(load)
 watch(city, load)
 </script>
 
 <style scoped>
+/* ================================================================
+   顶部模式切换（直接生成 / 详细规划）
+   ================================================================ */
+.mode-tabs {
+  display: flex; gap: 4px;
+  margin: 0 var(--gutter) 14px;
+  padding: 3px; border-radius: 9px;
+  background: var(--surface-3);
+}
+.mode-tab {
+  flex: 1; padding: 8px 12px; border-radius: 7px;
+  font-size: 13.5px; font-weight: 550; color: var(--ink-2);
+  transition: background 0.18s var(--ease), color 0.18s var(--ease),
+    box-shadow 0.18s var(--ease);
+}
+.mode-tab:hover { color: var(--ink); }
+.mode-tab.on {
+  background: var(--surface); color: var(--brand-deep); font-weight: 660;
+  box-shadow: var(--sh-1);
+}
+
+/* ---------- 直接生成（一键 AI） ---------- */
+.auto-wrap { padding: 0 var(--gutter) 30px; }
+.auto-card {
+  max-width: 520px; margin: 0 auto;
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 13px;
+}
+.auto-title { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.015em; }
+.auto-desc { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+.auto-btn { width: 100%; margin-top: 3px; }
+.auto-note {
+  margin: 0; font-size: 12px; color: var(--ink-3);
+  line-height: 1.65; text-align: center;
+}
+
 /* ================================================================
    宽屏：左列表 + 右粘性设置栏
    ================================================================ */
@@ -497,6 +627,12 @@ watch(city, load)
    手机形态：设置面板变成底部浮条
    ================================================================ */
 @media (max-width: 640px) {
+  .mode-tabs { margin: 0 var(--gutter) 11px; }
+  .mode-tab { padding: 7.5px 10px; font-size: 13px; }
+  .auto-wrap { padding: 0 var(--gutter) 24px; }
+  .auto-card { padding: 16px; gap: 11px; }
+  .auto-title { font-size: 16px; }
+
   .pick-layout { display: block; padding-bottom: 100px; }
   .pick-bar { padding: 11px 0 3px; font-size: 12px; }
   .att-grid { display: flex; flex-direction: column; gap: 9px; padding-top: 8px; }

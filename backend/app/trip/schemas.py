@@ -82,6 +82,41 @@ class PlanRequest(BaseModel):
         return PACE_LABELS.get(self.pace, self.pace)
 
 
+class AutoPlanRequest(BaseModel):
+    """「一键 AI」入参：只给城市 + 天数 + 节奏必填，景点由服务端自动挑选。
+
+    与 PlanRequest 拆成两个模型，是为了让「勾选生成」与「一键生成」的契约各自清楚、
+    互不影响 —— 后者内部先挑景点，再转成 PlanRequest 走同一条生成链路。
+    """
+
+    city: str = Field(..., description="城市名或拼音，如 成都 / chengdu")
+    days: int = Field(2, ge=1, le=7, description="行程天数 1~7（必填）")
+    pace: PacePref = Field("balanced", description="relaxed=宽松 / balanced=平衡 / packed=紧凑（必填）")
+    transport: Transport = Field("mixed", description="drive=自驾 / mixed=打车+公共 / transit=公共")
+    start_time: str = Field("09:00", description="每天出发时间 HH:MM")
+    return_time: str = Field("19:30", description="目标返回时间 HH:MM")
+    first_day_start_time: str | None = Field(None, description="第一天到达/出发时间")
+    last_day_return_time: str | None = Field(None, description="最后一天返回时间")
+
+    @field_validator("start_time", "return_time")
+    @classmethod
+    def _check_hhmm(cls, v: str) -> str:
+        return _norm_hhmm(v)
+
+    @field_validator("first_day_start_time", "last_day_return_time")
+    @classmethod
+    def _check_optional_hhmm(cls, v: str | None) -> str | None:
+        if v is None or not str(v).strip():
+            return None
+        return _norm_hhmm(v)
+
+    @field_validator("transport", mode="before")
+    @classmethod
+    def _norm_transport(cls, v):
+        # 老数据/老前端传的是 taxi，等价于 mixed
+        return "mixed" if v == "taxi" else v
+
+
 TRANSPORT_LABELS = {"drive": "自驾", "mixed": "打车+公共", "transit": "公共交通", "taxi": "打车+公共"}
 PACE_LABELS = {"relaxed": "宽松", "balanced": "平衡", "packed": "紧凑"}
 

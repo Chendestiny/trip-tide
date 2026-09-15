@@ -23,6 +23,7 @@ from app.core.db import get_db
 from app.trip import llm, service
 from app.trip.schemas import (
     AttractionOut,
+    AutoPlanRequest,
     CityOut,
     PlanBrief,
     PlanPreview,
@@ -79,6 +80,33 @@ def post_plan(payload: PlanRequest, db: Session = Depends(get_db)) -> PlanRespon
         logger.exception("生成行程失败")
         raise HTTPException(
             status_code=500, detail=f"生成行程失败：{type(exc).__name__}: {exc}"
+        ) from exc
+
+
+@router.post(
+    "/auto-plan",
+    response_model=PlanResponse,
+    summary="一键 AI：只给城市 + 天数 + 节奏，自动挑景点并生成",
+)
+def post_auto_plan(
+    payload: AutoPlanRequest, db: Session = Depends(get_db)
+) -> PlanResponse:
+    """一键 AI 入口。
+
+    与 `POST /plan` 的唯一区别：**不需要传 `attraction_ids`**，景点由服务端按
+    天数与节奏自动挑（必去优先、其次热度）。挑完走的是同一条生成链路，
+    因此返回结构与降级行为完全一致；实际选中的景点在 `request.attraction_ids` 里。
+    """
+    try:
+        return service.generate_auto_plan(db, payload)
+    except HTTPException:
+        raise
+    except llm.LLMError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("一键 AI 生成失败")
+        raise HTTPException(
+            status_code=500, detail=f"一键 AI 生成失败：{type(exc).__name__}: {exc}"
         ) from exc
 
 

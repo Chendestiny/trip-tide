@@ -58,6 +58,10 @@ export const previewPlan = (payload) =>
 export const createPlan = (payload) =>
   request('/plan', { method: 'POST', body: payload, timeout: PLAN_TIMEOUT })
 
+/** 一键 AI：只给城市 + 天数 + 节奏，景点由服务端自动挑，再走同一条生成链路 */
+export const autoPlan = (payload) =>
+  request('/auto-plan', { method: 'POST', body: payload, timeout: PLAN_TIMEOUT })
+
 /** 按倾向微调已有方案：纯硬编码、毫秒级，不重新走 LLM */
 export const adjustPlan = (planId, payload) =>
   request(`/plan/${planId}/adjust`, { method: 'POST', body: payload, timeout: 15000 })
