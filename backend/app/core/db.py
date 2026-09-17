@@ -89,6 +89,9 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
     "trip_city": {
         "kind": "VARCHAR(10) NOT NULL DEFAULT 'city'",
         "region": "VARCHAR(16) NOT NULL DEFAULT ''",
+        # 首页排序分。老库补上这列后值全是 0 → 首页退化成按 City.heat 排，
+        # 所以补列之后必须跑一次 `scripts/rank_cities.py` 重算（seed 也会自动重算）。
+        "rank_score": "INT NOT NULL DEFAULT 0",
     },
 }
 

@@ -83,8 +83,11 @@ def run_viewport(browser, label: str, viewport: dict, skip_plan: bool) -> list[s
     page.wait_for_timeout(700)
     pr.check("首页直开")
     body = page.inner_text("body")
-    if "热门城市" not in body:
-        pr.problems.append(f"[{label}] 首页没渲染出「热门城市」")
+    # 首页在「城市 | 区域」tab 改版后不再有「热门城市」这个标题，
+    # 改成直接数宫格卡片（原来的文字断言一直失败，是条假警报）
+    n_cards = page.eval_on_selector_all(".city-card", "els => els.length")
+    if n_cards == 0:
+        pr.problems.append(f"[{label}] 首页没渲染出目的地宫格（.city-card = 0）")
     if "成都" not in body:
         pr.problems.append(f"[{label}] 首页没有城市数据（先跑 seed）")
     pr.drain_errors("首页")

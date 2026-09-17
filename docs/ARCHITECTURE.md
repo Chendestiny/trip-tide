@@ -58,6 +58,7 @@
 2. 模型大量时间花在**重新推导硬编码已经算好的东西**（分天、路程、容量）。
 
 改成并行流水线后：**17.7 秒，快 3.7 倍**（4 天 10 个景点）。
+2026-09-16 关掉模型思考（`thinking: {"type": "disabled"}`）后进一步降到 **6~7 秒** —— 见 `CHANGELOG.md`。
 每天一路互不依赖，N 天只花 1 路的墙钟时间。
 
 ### 问题二：模型会把分天改坏
@@ -128,8 +129,24 @@
 ## 交通模型（三档 × 三种偏好，纯本地计算）
 
 用户只选一个大方向，具体方式由硬编码按距离与场景挑。
-**不接高德路径规划 API**——一次规划十几条腿，每条都打接口既慢又费配额，
-而规划阶段的精度要求不高（±10 分钟不影响方案可用性）。
+
+> **重要：`POST /api/trip/plan` 生成规划时不调用高德路径规划 API。**
+> 它只读取已经落库的 GCJ-02 坐标，在本地用 haversine 算直线距离，再按交通方式分档估算通行时间。
+> 这样一次规划十几条腿不会产生十几次外部请求，速度稳定，也不会消耗高德路径规划额度。
+
+高德在本项目中的调用边界是：
+
+| 阶段 | 高德接口 | 当前状态 | 说明 |
+|---|---|---|---|
+| seed 补坐标 | `/v3/geocode/geo` | **已接入，主路径** | 景点名/地址 → GCJ-02 坐标；基础 LBS 配额 15 万/月 |
+| seed 坐标兜底 | `/v3/place/text` | **已接入，低频兜底** | 地理编码失败才调用；POI 关键字搜索配额 5 千/月 |
+| 前端地图 | 高德 JS API | **已接入，可选** | `VITE_AMAP_JS_KEY` 存在时渲染地图，否则用 SVG 示意图 |
+| 生成规划 | 路径规划 API | **未调用** | 只走本地 `planner.leg()` / `haversine_km()` |
+| 行程定稿后校准 | `/v3/direction/driving` 等 | **待做** | 用户确认最终方案后，按路段/天缓存真实耗时，再替换估算值 |
+
+**不接高德路径规划 API**，是当前阶段的有意取舍，不是遗漏：一次规划十几条腿，每条都打接口既慢又费配额，
+而规划阶段的精度要求不高（约 ±10 分钟不影响方案可用性）。如果未来接入，必须放在「用户确认行程」之后，
+不能让它成为生成方案的前置依赖；高德不可用时仍要保留本地估算兜底。
 
 | 场景 | 🚗 自驾 | 🚕 打车+公共（默认） | 🚇 公共交通 |
 |---|---|---|---|
@@ -214,7 +231,7 @@ def push(node):
 
 这条不变量由两处守着：
 - `planner.rule_violations()` / `tools.audit_day()`（运行时）
-- `scripts/check_planner.py`（回归，8 个用例逐节点校验）
+- `scripts/check_planner.py`（回归，15 个用例逐节点校验）
 
 ## 紧凑度预估
 
@@ -348,16 +365,25 @@ Vue 就不挂载新组件。麻烦之处在于——**编译不报错、接口�
 
 ## 迁微信小程序的映射
 
-| Web | 小程序 |
-|---|---|
-| `views/trip/TripHome.vue` | `pages/index/index` |
-| `views/trip/TripPick.vue` | `pages/pick/pick` |
-| `views/trip/TripPlan.vue` | `pages/plan/plan` |
-| `views/trip/TripMe.vue` | `pages/me/me` |
-| `trip-api.js` | `utils/request.js`（`wx.request` 封装） |
-| `trip-store.js` | `wx.setStorageSync` / `getStorageSync` |
-| `TripMap.vue`（SVG 示意图） | `<map>` 组件（腾讯地图，GCJ-02 直接可用） |
-| `style.css` 的 CSS 变量 | WXSS 不支持变量，需替换成字面量或预处理器产物 |
+> 📌 小程序端**已落地在 `miniprogram/`**，与 `frontend/` 各写各的、不共享代码。
+> 完整说明（本地开发三档、刻意重复清单、待验证假设）见 [`MINIPROGRAM.md`](MINIPROGRAM.md)。
+
+| Web | 小程序 | 状态 |
+|---|---|---|
+| `views/trip/TripHome.vue` | `pages/index/index` | 🟡 现为自检页，待搬正式宫格 |
+| `views/trip/TripPick.vue` | `pages/pick/pick` | ⬜ 待做 |
+| `views/trip/TripPlan.vue` | `pages/plan/plan` | ⬜ 待做 |
+| `views/trip/TripMe.vue` | `pages/me/me` | ⬜ 待做 |
+| `main.js` + `App.vue` | `app.js` + `app.json` | ✅ 已建 |
+| `trip-api.js` | `utils/request.js`（`wx.request` 封装） | ✅ 已建 |
+| `trip-store.js` | `utils/store.js`（`wx.storage` + 手写订阅） | ✅ 已建 |
+| `trip-theme.js` | `utils/theme.js`（独立副本） | ✅ 已建 |
+| `TripMap.vue`（高德 JS API，失败降级 SVG） | `<map>` 组件（腾讯地图） | ⬜ **必须重写** |
+| `style.css` 的 35 个 CSS 变量 | WXSS 不支持变量，样式各写各的 | ⬜ |
+
+**地图是唯一必须重写的组件**：`TripMap.vue` 依赖高德 **JS API** + `window._AMapSecurityConfig`，
+小程序没有 DOM，高德 JS API 根本用不了。好在全库坐标已是 GCJ-02，腾讯 `<map>` 直接吃（铁律 4），
+而且 marker / polyline **不需要 key**。
 
 请求合法域名要在小程序后台把后端域名加进白名单；`PhoneShell` 的手机壳在真机上要去掉。
 后端完全不用改——流水线那套与端无关。

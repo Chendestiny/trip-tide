@@ -10,7 +10,7 @@
             <path d="M15.6 8.4 13.2 13.2 8.4 15.6 10.8 10.8z" />
           </svg>
         </span>
-        <span>AI 行程规划师</span>
+        <span>AI 旅行搭子</span>
       </router-link>
       <nav class="site-nav">
         <router-link to="/trip">规划</router-link>

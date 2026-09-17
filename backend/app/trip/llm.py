@@ -77,7 +77,7 @@ class LLMError(RuntimeError):
 
 
 # ================================================================ 提示词
-DAY_SYSTEM = """你是「TripTide」的行程编辑。系统已经用地理邻近度把景点分好了天，
+DAY_SYSTEM = """你是「AI 旅行搭子」的行程编辑。系统已经用地理邻近度把景点分好了天，
 你只负责为**指定的这一天**补充内容。不要质疑分天结果，不要调整顺序，不要增删景点。
 
 只输出 JSON，不要任何解释：
@@ -89,7 +89,8 @@ DAY_SYSTEM = """你是「TripTide」的行程编辑。系统已经用地理邻�
 }
 
 硬性要求：
-1. notes 必须覆盖当天**每一个**景点，一条不漏。
+1. notes **只写标注了「要 advice」的景点**。标了「已有内部攻略」的**不要写** ——
+   系统会用预存的点位攻略（从哪个门进、几点人少、有什么坑），你写了也是白写，还浪费 token。
 2. advice 要具体可执行：几点去人少、从哪个门进、要不要预约、排队多久、周边吃什么。
    禁止「值得一去」「风景优美」「不容错过」这类空话。
 3. 餐饮只给**区域 + 本地特色小吃/菜系**，**不要写具体店名**——店铺随时会换，写了会误导。
@@ -136,9 +137,13 @@ def _day_user_prompt(
         flags = []
         if planner._is_must(a):
             flags.append("必去")
+        # 有子景点的景点：advice 由 `planner.spot_advice()` 用预存攻略硬编码拼出来，
+        # 不让模型重复写（省 token，且文案更稳、可人工校对）。
+        has_spots = bool(getattr(a, "spots", None))
         lines.append(
             f"  id={a.id} {a.name}｜{a.district or '—'}｜热度 {a.heat}｜"
-            f"建议 {a.visit_minutes} 分钟｜{'/'.join(flags) or '可选'}｜{a.intro or '—'}"
+            f"建议 {a.visit_minutes} 分钟｜{'/'.join(flags) or '可选'}｜"
+            f"{'已有内部攻略，不要写 advice' if has_spots else '要 advice'}｜{a.intro or '—'}"
         )
     districts = sorted({a.district for a in items if a.district})
     if districts:
@@ -175,19 +180,48 @@ def _review_user_prompt(plan: PlanResult, req: PlanRequest) -> str:
 
 
 # ================================================================ 轻量调用
-def chat_json(messages, *, temperature: float = 0.8, max_tokens: int = 4096) -> str:
-    """只要一段 JSON 文本、不绑定 schema 的调用（如 seed 生成景点名单）。"""
-    try:
-        resp = llm.chat(
-            messages,
-            model=settings.model_name,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"},
+# ⚠️ deepseek-flash 是**带思考**的模型，思考内容也计入 max_tokens。
+# 实测：让 seed 一次列 22 个景点 + 子景点，max_tokens=4096 时思考会把预算吃光 →
+# finish_reason=length、content 为空、reasoning 7416 字；同一请求给 8192 就正常。
+# 而底层报错是「模型返回内容为空」，完全看不出是这个原因，所以这里既给足预算，
+# 也在拿到空 content 时自动加倍重试一次（思考与否本身带随机性）。
+MAX_TOKENS_CEILING = 16384
+
+
+def chat_json(messages, *, temperature: float = 0.8, max_tokens: int = 8192) -> str:
+    """只要一段 JSON 文本、不绑定 schema 的调用（如 seed 生成景点名单）。
+
+    **别把 max_tokens 调小**：预算被思考吃光时模型返回的是**空 content**，
+    调用方会误以为「模型没说话」，实际是它把话说在了 reasoning 里。
+    """
+    budget = max_tokens
+    last = ""
+    for attempt in (1, 2):
+        try:
+            resp = llm.chat(
+                messages,
+                model=settings.model_name,
+                temperature=temperature,
+                max_tokens=budget,
+                response_format={"type": "json_object"},
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise LLMError(str(exc)) from exc
+
+        if resp.content.strip():
+            return resp.content
+
+        last = (
+            f"第 {attempt} 次返回空内容（finish_reason={resp.finish_reason or '?'}，"
+            f"reasoning {len(resp.reasoning)} 字，max_tokens={budget}）"
         )
-    except Exception as exc:  # noqa: BLE001
-        raise LLMError(str(exc)) from exc
-    return resp.content
+        logger.warning("chat_json %s", last)
+        budget = min(budget * 2, MAX_TOKENS_CEILING)
+
+    raise LLMError(
+        f"模型连续返回空内容：{last}。"
+        f"若 finish_reason=length，说明思考吃光了预算 —— 调大 max_tokens，不要怀疑模型没返回"
+    )
 
 
 def is_available() -> bool:

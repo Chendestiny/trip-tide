@@ -1,0 +1,16 @@
+{
+  "appid": "touristappid",
+  "projectname": "ai-travel-buddy",
+  "description": "AI 旅行搭子 小程序端",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "libVersion": "latest",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": false,
+    "ignoreDevUnusedFiles": false
+  }
+}

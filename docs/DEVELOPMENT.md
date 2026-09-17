@@ -32,13 +32,37 @@ cp .env.example .env      # 填 DATABASE_URL / DEEPSEEK_API_KEY / AMAP_KEY
 
 ```bash
 cd backend
-venv\Scripts\python -m app.trip.seed              # 全部 8 城
-venv\Scripts\python -m app.trip.seed --city 成都   # 只灌一个城市
+venv\Scripts\python -m app.trip.seed              # 全部 18 个目的地（很慢，见下）
+venv\Scripts\python -m app.trip.seed --city 成都   # 只灌一个城市（推荐）
 venv\Scripts\python -m app.trip.seed --list       # 看库里现状
 ```
 
-有 Key 时走「LLM 出名单 → 高德 POI 搜索补坐标」；无 Key 时用离线种子（`data/seed_attractions.json`，8 城 + 贵州环线 ≈ 190 条）。
-一次全量约 160–200 次高德请求，受 `AMAP_SLEEP=0.25s` 串行节流，**约 40 秒以上**。
+有 Key 时走「LLM 出名单 → 高德**地理编码**补坐标（POI 搜索只作兜底）」；无 Key 时用离线种子
+（`data/seed_attractions.json`，**18 个目的地都与库逐字段一致**）。
+
+种子里的条目都带 `coord_source=amap` 与子景点坐标，所以 `--source offline`
+**不打任何高德请求**（实测北京 26 景 / 5.2 秒 / 0 次校准）。
+
+> 📌 **种子必须与库保持同步。** 曾经漂移过一次：老 7 城的种子停留在 T 级迁移之前
+> （`heat` 是 0~100 旧尺度，故宫种子 99 / 库里 990），配上 `MUST_HEAT=500`
+> **离线灌数据一个「必去」都判不出来**。改完库里的景点数据后，记得把种子一起对齐
+> （做法与教训见 [`CHANGELOG.md`](CHANGELOG.md) 2026-09-16 第 7 节）。
+
+单城约 22 景 + 60~80 条子景点 ≈ 100 次高德请求，受 `AMAP_SLEEP=0.8s` 串行节流
+加上高德自身约 0.8s 的响应延迟，**实测 2~3 分钟**。当前坐标调用顺序是：
+
+1. `GET /v3/geocode/geo`：地理编码主路径，基础 LBS 配额 **15 万/月**；
+2. 地理编码查不到时，才 `GET /v3/place/text`：POI 关键字兜底，配额 **5 千/月**；
+3. 两者都失败才跳过该条坐标；如果高德明确返回额度耗尽，会抛 `AmapQuotaExceeded` 并熔断对应接口，**不再静默丢整批数据**。
+
+> ⚠️ **给老城补数据必须逐个 `--city`**：`main()` 不带参数时会遍历种子里**所有**城市，
+> 每城都调一次 DeepSeek 出名单 —— 那会把手工校对过的老城数据覆盖掉。
+>
+> ⚠️ **别把两个城市并行跑**：`AMAP_SLEEP=0.8s` 是为了避开高德 QPS 限流，
+> 并行会增加 `10004` / `10021` 等 QPS 错误；QPS 限流和月/日额度耗尽是两类问题，代码分别处理。
+>
+> **规划阶段不走上述任何接口**：`POST /api/trip/plan` 直接使用数据库里的 GCJ-02 坐标，
+> `planner.py` 本地计算 haversine 距离与分档通行时间；高德路径规划只留给未来「用户确认行程后的定稿校准」。
 
 | 参数 | 作用 |
 |---|---|
@@ -54,7 +78,7 @@ venv\Scripts\python -m app.trip.seed --list       # 看库里现状
 ```bash
 cd frontend
 npm install
-npm run dev        # → http://localhost:5173
+npm run dev        # → http://localhost:5176
 ```
 
 `frontend/.env` 里可选配 `VITE_AMAP_JS_KEY`（高德 **JS API** Key）。不填则地图用 `TripMap.vue` 的 SVG 示意图，其余功能不受影响。
@@ -63,11 +87,11 @@ npm run dev        # → http://localhost:5173
 
 ```bash
 npm install        # 根目录，装 concurrently
-npm run dev        # 前端 5173 + 后端 8000
+npm run dev        # 前端 5176 + 后端 8002
 npm run seed       # 等价于 backend 里的初始化
 ```
 
-浏览器打开 http://localhost:5173，`/api` 由 Vite 自动代理到 8000。
+浏览器打开 http://localhost:5176，`/api` 由 Vite 自动代理到 8002。
 
 ---
 
@@ -83,9 +107,9 @@ npm run seed       # 等价于 backend 里的初始化
 | `AMAP_KEY` | seed 阶段不校准坐标，用种子里手校的值 |
 | `LLM_TIMEOUT` | ✅ **有效**，用于 httpx / OpenAI 客户端超时 |
 | `PRIVATE_LLM_API_KEY` / `_BASE_URL` / `_MODEL` | 私有化部署用；配了之后 `deployment="private"` 才生效 |
-| `CORS_ORIGINS` | 默认只放行 `localhost:5173` / `127.0.0.1:5173` |
+| `CORS_ORIGINS` | 默认只放行 `localhost:5176` / `127.0.0.1:5176` |
 
-> ⚠️ **六个配置项是死的**：`LLM_MAX_RETRY`、`LLM_TEMPERATURE`、`LLM_MAX_TOKENS`、`DEFAULT_START_TIME`、`DEFAULT_RETURN_TIME`、`MAX_DAYS` 在代码里**零引用**。实际值硬编码在各调用点（`llm.py` 的 0.6/2000、0.3/1200、0.8/4096），时间与天数默认值写死在 `schemas.py`。改 `.env` 里这几项**不会生效**——要么改代码，要么先把配置接通。
+> ⚠️ **六个配置项是死的**：`LLM_MAX_RETRY`、`LLM_TEMPERATURE`、`LLM_MAX_TOKENS`、`DEFAULT_START_TIME`、`DEFAULT_RETURN_TIME`、`MAX_DAYS` 在代码里**零引用**。实际值硬编码在各调用点（`llm.py` 的 0.6/2000、0.3/1200、0.8/**8192**），时间与天数默认值写死在 `schemas.py`。改 `.env` 里这几项**不会生效**——要么改代码，要么先把配置接通。
 
 前端地图 Key 走 `frontend/.env` 的 `VITE_AMAP_JS_KEY`（高德 **JS API** 类型，与后端的 Web 服务 Key **不通用**）。若控制台给 Key 绑了「安全密钥」，还要填 `VITE_AMAP_SECURITY_CODE`（`TripMap.vue:295` 会在加载脚本前注入 `window._AMapSecurityConfig`，漏了地图不渲染）。
 
@@ -95,15 +119,21 @@ npm run seed       # 等价于 backend 里的初始化
 
 | 任务 | 命令 |
 |---|---|
-| 起前后端 | 根目录 `npm run dev` |
+| 起前后端 | 根目录 `npm run dev`（前端 5176 + 后端 8002） |
 | 只起后端 | `cd backend && venv/Scripts/python run.py`（支持 `--host` / `--port` / `--no-reload`） |
-| 灌数据 | `cd backend && venv/Scripts/python -m app.trip.seed` |
+| 起小程序端 | 微信开发者工具导入 **`miniprogram/`** 目录（不是仓库根），详见 [`MINIPROGRAM.md`](MINIPROGRAM.md) |
+| 灌数据 | `cd backend && venv/Scripts/python -m app.trip.seed`（**不带参数会遍历所有目的地**，别用来补老城） |
+| 只灌新目的地 | `... -m app.trip.seed --only-empty --per 8` —— **只处理库里还没有景点的目的地**，不会碰老城 |
 | 看库里现状 | `venv/Scripts/python -m app.trip.seed --list` |
 | 后端规则引擎回归 | `cd backend && venv/Scripts/python ../scripts/check_planner.py` |
+| 跨目的地边界检查 | `cd backend && venv/Scripts/python ../scripts/check_boundaries.py`（`-v` 看完整清单）—— **加了目的地之后必跑** |
+| 首页排序体检 | `cd backend && venv/Scripts/python ../scripts/check_rank.py`（`--drill` 补口径对照）—— **只读**，查「首页为什么是这个顺序」+ 排序分是否过期 |
+| 重算首页排序分 | `cd backend && venv/Scripts/python ../scripts/rank_cities.py`（`--dry-run` 先看）—— **改过景点热度后必跑**；seed 会自动跑 |
+| 增量补景点 | `cd backend && venv/Scripts/python -m app.trip.seed --topup --per 10` —— 景点数不足 10 的补到 10，**已有的绝不动**；坐标只走地理编码（不打 POI 搜索）；完自动回写离线种子 + 重算排序分 |
 | 前端冒烟测试 | `python scripts/smoke_ui.py`（需先起前后端） |
-| 健康检查 | `curl -s -x "" localhost:8000/api/health` |
-| 模型别名总表 | `curl -s -x "" localhost:8000/api/health/models` |
-| 交互式接口文档 | http://localhost:8000/docs |
+| 健康检查 | `curl -s -x "" localhost:8002/api/health` |
+| 模型别名总表 | `curl -s -x "" localhost:8002/api/health/models` |
+| 交互式接口文档 | http://localhost:8002/docs |
 
 > Windows 下 `curl` 会走系统代理，访问 localhost **必须加 `-x ""`** 绕过，否则报「积极拒绝」。
 
@@ -113,9 +143,23 @@ npm run seed       # 等价于 backend 里的初始化
 
 ### 纯函数单元测试：`backend/tests/test_planner.py`
 
-**不连数据库、不调 LLM、不起服务**，毫秒级跑完。覆盖：景点分级 / 用餐时长 /
-时间预算 / 时段规则 / 地理聚类 / 一键挑景点 / LLM 分天的硬校验。
-（其中好几条是回归用的 —— 比如「时间预算不随 pace 变化」「紧邻景点拆到两天要报错」。）
+**不连数据库、不调 LLM、不起服务**，毫秒级跑完，**122 个用例**。覆盖：
+
+| 分组 | 覆盖 |
+|---|---|
+| 基础 | 景点分级 / 用餐时长 / 时间预算 / 时段规则 / 地理与矩阵 / 聚类 / 独占判定 |
+| 分天 | 一键挑景点 / `assign_days` / `_validate_days` 的 5 道硬校验 |
+| 提示词 | 景点清单与通行矩阵的渲染 |
+| **2026-09-17 第一波** | `spot_advice` 拼串（排序/截断/空攻略/缺属性）、advice 取值优先级（子景点 > LLM > intro）、`trim_day` 的超载例外、机动日两餐、`chat_json` 的空返回重试、seed 的地理上下文提示词与坐标校验 |
+| **2026-09-17 第二波（amap 配额重构）** | `is_quota_error` / `is_qps_error` 错误码分类、双熔断独立（geo/poi 互不影响）、`search_address` 走地理编码主路径（POI 级优先 / count=0 兜底）、`search_poi` 内部「先 geo 后 poi」兜底链、geo 熔断后仍能回退 POI、两边都熔断时不再发请求 |
+
+其中好几条是回归用的 —— 比如「时间预算不随 pace 变化」「紧邻景点拆到两天要报错」
+「机动日必须有午餐」「POI 熔断不能误停地理编码」「geo 用尽后 search_poi 还能回退 POI」。
+＊＊每条新测试都对应一个实际踩过的坑＊＊，坑的说明写在 docstring 里。
+
+> ⚠️ amap 测试用 `patch.object(settings, "amap_key", "")` 模拟无 Key 场景 ——
+> `settings.has_amap` 是 pydantic property（只读），**只能改底层 `amap_key` 字段**，
+> 直接 patch `has_amap` 会报 `AttributeError: property has no setter`。
 
 ```bash
 cd backend && venv/Scripts/python tests/test_planner.py
@@ -131,7 +175,7 @@ cd backend && venv/Scripts/python -m unittest tests.test_planner -v
 
 ### 后端回归：`scripts/check_planner.py`
 
-**不启服务**，直接调 `planner.plan_fallback()` 跑 8 个用例，逐节点校验 6 项。
+**不启服务**，直接调 `planner.plan_fallback()` 跑 15 个用例，逐节点校验 6 项。
 
 ```bash
 cd backend && venv/Scripts/python ../scripts/check_planner.py
@@ -139,7 +183,7 @@ cd backend && venv/Scripts/python ../scripts/check_planner.py
 
 校验项：① 时间自洽（`prev.time + prev.stay + cur.travel == cur.time`）② 午餐恰好 1 个且落在 11:00~16:00 ③ 晚餐恰好 1 个且落在 17:30~21:30 ④ 出发时间等于用户设定、最后一个节点是 hotel ⑤ 主题里提到的景点必须真的在当天时间轴 ⑥ 每个勾选景点要么排入要么进 `dropped`（不能凭空消失）。
 
-8 个用例（`CASES`，121–130 行）：
+15 个用例（`CASES`，44 行起，完整清单直接看脚本）：
 
 | # | 城市 | 景点数 | 天数 | transport | 压什么 |
 |---|---|---|---|---|---|
@@ -169,7 +213,7 @@ python scripts/smoke_ui.py --skip-plan  # 跳过耗时约 20s 的规划环节
 - **两个视口都测**：宽屏 1280×900（多列栅格 + 右侧粘性面板 + 顶部导航）、手机 390×844（单列 + 底部浮条 + 标签栏）
 - **白屏判定**：`#app` 的 `innerHTML` 长度 < `MIN_CONTENT = 500`（35 行）
 - 监听 `pageerror` 与 `console.error`，任一出现即记为问题
-- `BASE = http://localhost:5173`，默认城市成都
+- `BASE = http://localhost:5176`，默认城市成都
 
 > 本机环境提示：`agent-browser` 类工具在 Windows 上不可用，`smoke_ui.py` 借系统 Edge（`channel="msedge"`）是本机唯一可行的浏览器自动化路径。
 
@@ -196,6 +240,11 @@ python scripts/smoke_ui.py --skip-plan  # 跳过耗时约 20s 的规划环节
 | 宽屏下界面像「拉大的手机」 | 只写了手机样式，缺宽屏样式（桌面优先，见铁律） |
 | MySQL 连不上 | `DATABASE_URL` 账号要有建库权限，或先手工建库 |
 | `openai` 未安装 | 不致命，`core/_llm/_native.py` 会自动降级到 httpx 实现 |
+| 后端日志中文乱码（`���ݱ��Ѿ�`） | `npm run dev` 经 cmd 转发输出，Python 默认按 **GBK** 写 stdout，而 concurrently 按 **UTF-8** 解码。脚本已加 `-X utf8` 修正；自己手敲 `python -m uvicorn` 时记得补上（`run.py` 直跑不受影响——终端与 Python 都是 GBK，能对上） |
+| 刚启动时前端报 `ECONNREFUSED 127.0.0.1:8002` | **正常竞态，不是故障**——vite 比 uvicorn 快约 2s（后端要先连库、跑建表/轻量迁移）。页面刷新一下即可 |
+| LLM 报「模型返回内容为空」 | 十有八九是**思考吃光了 `max_tokens`**：`deepseek-flash` 默认思考，而**思考内容也计入预算**，于是 `content` 为空、`finish_reason=length`，报错却完全指错方向。先看日志里有没有 `chat_json 第 N 次返回空内容（... reasoning X 字）`；再查 `_native.py` 的 `_build_body` —— 参数必须是 `thinking: {"type": "disabled"}`，**`enable_thinking: False` 是 DashScope 风格，DeepSeek 不认**（详见 `CHANGELOG.md` 2026-09-16 第 3 节） |
+| 落库前复核稳定报「1 处问题」 | 检查是不是把「跨午饭拆分」当成了重复景点——同一天内两个同名节点是**有意的**。已修（`service.audit_plan` 只报跨天重复） |
+| `seed` 出的名单缺该城核心景区 | 看 `seed.py` 的 `LIST_USER` 里「近郊景点」那条限制。踩过：桂林的名单被市区小公园占满、阳朔一个没进。已加「核心近郊景区必须包含」的说明 |
 
 ---
 
@@ -206,7 +255,7 @@ python scripts/smoke_ui.py --skip-plan  # 跳过耗时约 20s 的规划环节
 ```
 plan_days days=4 kept=10 dropped=2          # ① 分天完成
 gen_day day=1 ok / gen_day day=3 ✗           # ② 各天并行生成结果（✗ = 该天回退规则文案）
-materialize days=4 elapsed=17.7s            # ③ 物化耗时（这是整条链路的总耗时）
+materialize days=4 elapsed=6.5s             # ③ 物化耗时（这是整条链路的总耗时）
 落库前复核发现 K 处问题：...                  # audit_plan 抓到的问题（正常应为 0）
 LLM 流水线失败，降级到规则引擎：...            # 整体降级
 ```
@@ -215,10 +264,10 @@ LLM 流水线失败，降级到规则引擎：...            # 整体降级
 
 | trace 内容 | 来源 |
 |---|---|
-| `plan_days days=N kept=X dropped=Y` | `llm.py:287` |
-| `gen_day day=N ok` / `gen_day day=N ✗` | `llm.py:318 / 321` |
-| `materialize days=N elapsed=X.Xs` | `llm.py:377` |
-| `adjust mode=tweak pace=P days=D restored=N` | `service.py:408` |
+| `plan_days days=N kept=X dropped=Y` | `llm.py:315` |
+| `gen_day day=N ok` / `gen_day day=N ✗` | `llm.py:359 / 362` |
+| `materialize days=N elapsed=X.Xs` | `llm.py:420` |
+| `adjust mode=tweak pace=P days=D restored=N` | `service.py:555` |
 
 ---
 
@@ -232,9 +281,10 @@ LLM 流水线失败，降级到规则引擎：...            # 整体降级
 
 ### 高优先：会直接误导的
 
-1. **清掉或标注死代码**。`tools.py` 整套工具链（10 个工具 + `PlanSession` + `dispatch`）与 `amap.py` 的 `search_around` / `search_restaurants` 都**没有调用方**。`llm.py:35` 声称「用 `LLM_MODE=tools` 打开」——该开关从未实现。
+1. **清掉或标注死代码**。`tools.py` 整套工具链（10 个工具 + `PlanSession` + `dispatch`）、`amap.py` 的 `search_around` / `search_restaurants`、以及 `planner.route_minutes()` 都**没有调用方**。`llm.py:35` 声称「用 `LLM_MODE=tools` 打开」——该开关从未实现。
    → 建议：要么补上 `LLM_MODE` 开关让它真能用，要么在文件头明确标注「预留能力，当前未启用」。**保留 `audit_day()`，它在用。**
-2. **修注释与实际不符的地方**（共 8 处，清单见 [`BACKEND.md`](BACKEND.md#代码与注释不一致的地方写文档改代码时以代码为准)）。其中 `trip/__init__.py:6`「4 个端点」、`README`/`AGENTS` 里的「11 个工具」影响最大。
+   ⚠️ `route_minutes()` 尤其容易误用：它的模型比 `leg()` 粗得多 —— 同一个 105km，它按地铁 22km/h 算成 **295 分**，而 `leg()` 走城际铁路是 **90 分**（复核新景点时我自己就踩了）。主流程一律走 `leg()` / `travel_from()`。
+2. **修注释与实际不符的地方**（共 10 处，清单见 [`BACKEND.md`](BACKEND.md#代码与注释不一致的地方写文档改代码时以代码为准)）。其中 `trip/__init__.py:6`「4 个端点」、`README`/`AGENTS` 里的「11 个工具」影响最大。
 3. **决定那 6 个死配置的去留**：接通，或者删掉，或者注释说明「暂不生效」。
 
 ### 中优先：影响正确性/一致性
@@ -248,7 +298,7 @@ LLM 流水线失败，降级到规则引擎：...            # 整体降级
    - **仍未处理**：必去景点在容量裁剪时仍可能被丢（`_value` 的 +30 加成抵不过远郊景点的高耗时）。
      成都「前 10 景 × 1 天」实测把必去的大熊猫基地丢了 —— 产品上是否合理仍需定夺。
 5. **前端重复定义**：`TripPlan.vue:255` 本地定义的 `PACE_LABEL` 与 `trip-theme.js:45` 的重复。`trip-theme` 里的 `DAY_COLORS` 与 `PACE_LABEL` 零引用。→ 统一到 `trip-theme.js`。
-6. **`check_planner.py` 补用例**：现在只覆盖 `taxi`（=`mixed`）和 `transit` 两种，缺 `drive`；也没覆盖首末天不同时间窗（`first_day_start_time` / `last_day_return_time`）。
+6. ~~**`check_planner.py` 补用例**~~ —— **2026-09-17 已补**：现在 15 个用例，覆盖 `mixed`（历史值 `taxi`）/ `transit` / **`drive`**、首末天时间窗、以及 **region 链式转场**（贵州/川西/南疆）。顺带修了脚本里硬编码的 `city_id==1/2`（改成按名字查）与两处误报。
 7. **`trip_plan.source` 字段注释**只写了 `llm/fallback`，实际还有 `tweak`。
 
 ### 低优先：能力扩展（V1 明确的取舍）

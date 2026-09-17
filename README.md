@@ -1,9 +1,10 @@
-# TripTide — AI 行程规划
+# AI 旅行搭子 — AI 行程规划
 
 国内旅游自助规划工具：**选城市 → 勾景点 → AI 出按天方案**（地理顺路排序、时间轴、餐饮区域、住宿片区与取舍理由）。
 
-V1 交付形态是 **响应式网页版**（Vue 3 + Vite，桌面优先，宽度 ≤640px 才切手机 App 形态），
-页面结构与微信小程序一一对应，后续迁原生小程序基本是「HTML→WXML、样式复用」的机械转换。
+V1 交付形态是 **响应式网页版**（Vue 3 + Vite，桌面优先，宽度 ≤640px 才切手机 App 形态）。
+微信小程序端**已另起一个目录** `miniprogram/`，与网页版**各写各的、不共享代码**，
+页面一一对应，详见 [`docs/MINIPROGRAM.md`](docs/MINIPROGRAM.md)。
 
 ---
 
@@ -30,7 +31,7 @@ V1 交付形态是 **响应式网页版**（Vue 3 + Vite，桌面优先，宽度
 |---|---|
 | ![结果页](docs/screenshots/wide-3-plan.png) | ![手机](docs/screenshots/mobile-2-pick.png) |
 
-视觉是一套自建的设计系统（`style.css` 顶部的 32 个 CSS 变量）：偏暖的中性底色、多层叠加阴影、
+视觉是一套自建的设计系统（`style.css` 顶部的 35 个 CSS 变量）：偏暖的中性底色、多层叠加阴影、
 8 色循环的城市图标、按天配色的时间轴（7 色循环）。没有引 UI 框架——这个界面只有 4 页，自绘比配 Element Plus 更轻也更可控。
 
 ---
@@ -80,37 +81,48 @@ cp .env.example .env      # 填 DATABASE_URL / DEEPSEEK_API_KEY / AMAP_KEY
 
 ```bash
 cd backend
-venv\Scripts\python -m app.trip.seed              # 全部目的地（8 城 + 贵州）
-venv\Scripts\python -m app.trip.seed --city 成都   # 只灌一个城市
+venv\Scripts\python -m app.trip.seed              # 全部 18 个目的地（很慢，见下）
+venv\Scripts\python -m app.trip.seed --city 成都   # 只灌一个城市（推荐）
 venv\Scripts\python -m app.trip.seed --list       # 看库里现状
 ```
 
-有 Key 时走「LLM 出名单 → 高德 POI 搜索补真实坐标」；无 Key 时用离线种子（`data/seed_attractions.json`，8 城 + 贵州环线 ≈ 190 条）。
-一次全量约 160~200 次高德请求，受 `AMAP_SLEEP=0.25s` 串行节流，约 40 秒以上。
+有 Key 时走「LLM 出名单 → 高德**地理编码**补真实坐标（POI 搜索只作兜底）」；无 Key 时用离线种子
+（`data/seed_attractions.json`，**18 个目的地都与库逐字段一致**）。种子里的条目都带
+`coord_source=amap` 与子景点坐标，所以 `--source offline` **不打任何高德请求**。
+
+> 📌 **种子必须与库保持同步**：曾经漂移过一次（老城的 `heat` 停留在 T 级迁移之前的 0~100 旧尺度，
+> 离线灌数据一个「必去」都判不出来）。改完库里的景点数据后记得一起对齐。
+
+单城约 22 景 + 60~80 条子景点 ≈ 100 次高德请求，受 `AMAP_SLEEP=0.8s` 串行节流，**实测 2~3 分钟**。
+**给老城补数据必须逐个 `--city`**：不带参数会遍历所有城市、每城调一次 DeepSeek，
+把手工校对过的老城名单覆盖掉。
 
 ### 3. 前端
 
 ```bash
 cd frontend
 npm install
-npm run dev        # → http://localhost:5173
+npm run dev        # → http://localhost:5176
 ```
 
 ### 4. 一条命令起前后端（推荐）
 
 ```bash
 npm install        # 根目录，装 concurrently
-npm run dev        # 前端 5173 + 后端 8000
+npm run dev        # 前端 5176 + 后端 8002
 npm run seed       # 等价于 backend 里的初始化
 ```
 
-浏览器打开 http://localhost:5173 即可，`/api` 由 Vite 自动代理到 8000。
+浏览器打开 http://localhost:5176 即可，`/api` 由 Vite 自动代理到 8002。
 
 ### 5. 回归检查
 
 ```bash
-# 后端：规则引擎 8 个用例，逐节点校验时间自洽、饭点、主题一致性、景点不凭空消失
+# 后端：规则引擎 15 个用例，逐节点校验时间自洽、饭点、主题一致性、景点不凭空消失
 cd backend && venv/Scripts/python ../scripts/check_planner.py
+
+# 首页排序体检：排序分是否过期、顺序是否与口径一致（只读）
+cd backend && venv/Scripts/python ../scripts/check_rank.py
 
 # 前端：无头浏览器跑宽屏 + 手机两种视口，走完 4 个页面 + 真实规划（需先起前后端）
 python scripts/smoke_ui.py
@@ -137,7 +149,7 @@ python scripts/smoke_ui.py --skip-plan
 **为什么不让 LLM 自己编排。** 第一版是让模型用 10 个工具（function calling）自己编排，
 能跑，但**26 次工具调用、1.1 分钟**，而且它会把分天改坏：实测把熊猫基地挪到 14:20（熊猫午后在睡觉）、
 把宽窄巷子排进两天。提示词里写了两遍都没拦住——因为「算不算得下」本来就不该由它判断。
-改成并行流水线后 **17.7 秒，快 3.7 倍**。
+改成并行流水线后 **17.7 秒，快 3.7 倍**；2026-09-16 关掉模型思考后进一步降到 **6~7 秒**。
 
 **为什么后来又把 LLM 请回来审阅分天。** 因为**输入不一样了**：新方案给它的是
 **预计算的通行时间矩阵**，它不用猜距离、只需读表；再加 5 道硬校验（紧邻必须同天 /
@@ -232,4 +244,4 @@ python scripts/smoke_ui.py --skip-plan
 | [`docs/PLAN_SCHEMA.md`](docs/PLAN_SCHEMA.md) | 时间轴数据结构 `PlanResult` 全字段说明 |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | 环境搭建、常用命令、测试、排查表、待办 |
 | [`docs/testing-prompt.md`](docs/testing-prompt.md) | 交给其他模型写单元测试用的提示词（自包含） |
-| [`AGENTS.md`](AGENTS.md) | 给 AI agent 的操作手册与 17 条铁律 |
+| [`AGENTS.md`](AGENTS.md) | 给 AI agent 的操作手册与 21 条铁律 |

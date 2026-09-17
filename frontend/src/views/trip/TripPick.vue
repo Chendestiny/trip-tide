@@ -69,6 +69,13 @@
             <span v-if="selectedIds.length" class="pick-bar-num">已选 {{ selectedIds.length }}</span>
           </div>
 
+          <!-- 景点检索：按名称 / 子区域 / 标签匹配（纯前端过滤，不打接口） -->
+          <div class="att-search">
+            <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3" fill="none" stroke="currentColor" stroke-width="2" /><path d="M15.6 15.6 L20.4 20.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+            <input v-model="aq" type="text" placeholder="搜索景点名、区域或标签" aria-label="搜索景点" />
+            <button v-if="aq" class="search-clear" aria-label="清空搜索" @click="aq = ''">✕</button>
+          </div>
+
           <!-- 子区域筛选（多选）：region 目的地的景点分散在各地州，先框范围再勾 -->
           <div v-if="allAreas.length > 1" class="area-chips">
             <button
@@ -81,7 +88,14 @@
           </div>
 
           <div v-if="loading" class="att-grid">
-            <div v-for="i in 6" :key="i" class="card sk" />
+            <div v-for="i in 6" :key="i" class="att sk-att" aria-hidden="true">
+              <div class="att-main">
+                <span class="sk-line sk-w60" />
+                <span class="sk-line sk-w90" />
+                <span class="sk-line sk-w45" />
+              </div>
+              <span class="sk-tick" />
+            </div>
           </div>
 
           <div v-else-if="error" class="empty">
@@ -94,20 +108,26 @@
             <button
               v-for="a in visibleAttractions"
               :key="a.id"
-              :class="['att', { on: isOn(a.id) }]"
+              :class="['att', { on: isOn(a.id), remote: a.distance_km >= 45 }]"
               @click="toggle(a.id)"
             >
+              <!-- 远郊：左上角三角角标（原来是个 chip.hot，挂在标题行里） -->
+              <span
+                v-if="a.distance_km >= 45"
+                class="att-corner"
+                title="远郊 · 建议就近住一晚"
+              >远郊</span>
+
               <div class="att-main">
                 <div class="att-top">
                   <span class="att-name">{{ a.name }}</span>
                   <span v-if="a.must_visit" class="chip must">⭐ 必去</span>
                   <span class="chip hot">🔥 {{ a.heat }}</span>
-                  <span v-if="a.distance_km >= 45" class="chip hot">🚌 远郊 · 可就近住</span>
-                  <span v-else-if="a.distance_km >= 30" class="chip">🚗 周边</span>
                 </div>
                 <p class="att-intro">{{ a.intro }}</p>
                 <div class="att-meta">
                   <span class="chip primary">⏱ 建议 {{ fmtMin(a.visit_minutes) }}</span>
+                  <span class="chip">📍 距市中心 {{ a.distance_km }} km</span>
                   <span v-if="a.district" class="chip">{{ a.district }}</span>
                   <span v-for="t in (a.tags || []).slice(0, 2)" :key="t" class="chip">{{ t }}</span>
                 </div>
@@ -250,7 +270,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PhoneShell from '../../components/trip/PhoneShell.vue'
 import SpotSheet from '../../components/trip/SpotSheet.vue'
-import { autoPlan, createPlan, getAttractions, getSpots, previewPlan } from '../../trip-api'
+import { autoPlan, createPlan, getAttractions, getSpots, previewPlan } from '@api'
 import { commitPlan } from '../../trip-store'
 import { useIsWide } from '../../use-media'
 
@@ -326,15 +346,22 @@ const allSelected = computed(
 )
 
 // ---------- 子区域筛选（多选，空 = 全部） ----------
+const aq = ref('')          // 景点检索关键词
 const areaFilter = ref([])
 const allAreas = computed(() => [
   ...new Set(attractions.value.map((a) => a.district).filter(Boolean)),
 ])
-const visibleAttractions = computed(() =>
-  areaFilter.value.length
-    ? attractions.value.filter((a) => areaFilter.value.includes(a.district))
-    : attractions.value
-)
+const visibleAttractions = computed(() => {
+  const kw = aq.value.trim().toLowerCase()
+  return attractions.value
+    .filter((a) => !areaFilter.value.length || areaFilter.value.includes(a.district))
+    .filter((a) => {
+      if (!kw) return true
+      // 名称 / 子区域 / 标签都参与匹配
+      const hay = [a.name, a.district, ...(a.tags || [])].filter(Boolean).join(' ').toLowerCase()
+      return hay.includes(kw)
+    })
+})
 function toggleArea(d) {
   areaFilter.value = areaFilter.value.includes(d)
     ? areaFilter.value.filter((x) => x !== d)
@@ -502,6 +529,9 @@ watch(city, load)
   margin: 0 var(--gutter) 14px;
   padding: 3px; border-radius: 9px;
   background: var(--surface-3);
+  /* 边框是必需的：--surface-3(#eef1f0) 与页面底 --bg(#f2f4f3) 只差一点点，
+     没有边框时整条 tab 会「融进背景」，看不出哪里是可点的控件 */
+  border: 1px solid var(--line);
 }
 .mode-tab {
   flex: 1; padding: 8px 12px; border-radius: 7px;
@@ -509,7 +539,7 @@ watch(city, load)
   transition: background 0.18s var(--ease), color 0.18s var(--ease),
     box-shadow 0.18s var(--ease);
 }
-.mode-tab:hover { color: var(--ink); }
+.mode-tab:hover { color: var(--ink); background: var(--surface-2); }
 .mode-tab.on {
   background: var(--surface); color: var(--brand-deep); font-weight: 660;
   box-shadow: var(--sh-1);
@@ -518,7 +548,7 @@ watch(city, load)
 /* ---------- 直接生成（一键 AI） ---------- */
 .auto-wrap { padding: 0 var(--gutter) 30px; }
 .auto-card {
-  max-width: 520px; margin: 0 auto;
+  /* 撑满可用宽度：原来 max-width:520px + margin:auto，宽屏下右侧会空出一大片 */
   padding: 20px;
   display: flex; flex-direction: column; gap: 13px;
 }
@@ -538,7 +568,9 @@ watch(city, load)
   grid-template-columns: minmax(0, 1fr) 356px;
   gap: 22px;
   align-items: start;
-  padding-bottom: 30px;
+  /* 左右 gutter 必须自己加（.shell-body 没有内边距，.mode-tabs 是各自加的），
+     否则卡片区比上面的 tab 宽出左右各 24px */
+  padding: 0 var(--gutter) 30px;
 }
 .pick-bar {
   display: flex; align-items: center; justify-content: space-between;
@@ -555,6 +587,37 @@ watch(city, load)
   box-shadow: 0 0 0 3px var(--brand-soft);
 }
 
+/* ---------- 景点检索 ---------- */
+.att-search {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 11px;
+  padding: 0 11px; height: 40px;
+  border-radius: var(--r);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+.att-search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.att-search .search-icon {
+  width: 15px; height: 15px; color: var(--ink-4); flex-shrink: 0;
+  transition: color 0.18s var(--ease);
+}
+.att-search:focus-within .search-icon { color: var(--brand); }
+.att-search input {
+  flex: 1; min-width: 0;
+  border: none; outline: none; background: none;
+  font-size: 13.5px; color: var(--ink);
+}
+.att-search input::placeholder { color: var(--ink-4); }
+.att-search .search-clear {
+  flex-shrink: 0; width: 19px; height: 19px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--ink-3);
+  background: var(--surface-3);
+  transition: background 0.16s var(--ease), color 0.16s var(--ease);
+}
+.att-search .search-clear:hover { background: var(--line-2); color: var(--ink); }
+
 /* ---------- 景点卡片 ---------- */
 .att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 11px; }
 .att {
@@ -565,6 +628,8 @@ watch(city, load)
   background: var(--surface);
   border: 1px solid var(--line);
   box-shadow: var(--sh-1);
+  /* 手机端 .att-grid 是 flex column 滚动容器，不加这行卡片会被压扁（默认 shrink:1） */
+  flex-shrink: 0;
   transition: transform 0.2s var(--ease), border-color 0.2s var(--ease),
     box-shadow 0.2s var(--ease), background 0.2s var(--ease);
 }
@@ -590,6 +655,22 @@ watch(city, load)
 .att.on .att-name { color: var(--brand-deep); }
 .att-intro { margin: 7px 0 9px; font-size: 13px; color: var(--ink-2); line-height: 1.62; }
 .att-meta { display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* 远郊角标：左上角直角三角形。卡片自身的 overflow:hidden + border-radius
+   会把它的左上角自然裁圆，不用额外处理；内容区左移让位，避免压住景点名 */
+.att-corner {
+  position: absolute; left: 0; top: 0;
+  width: 58px; height: 26px;
+  padding: 5px 0 0 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.05em; line-height: 1;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  z-index: 3;
+}
+/* 让位必须用 padding-top —— 用 padding-left 的话有角标的卡片文字会整体右移，
+   和上下其他卡片对不齐（用户反馈）。压扁成 58×26 就是为了只占 6px 额外高度 */
+.att.remote { padding-top: 20px; }
 
 .tick {
   flex-shrink: 0; width: 22px; height: 22px; margin-top: 2px;
@@ -621,14 +702,12 @@ watch(city, load)
 .att:hover .att-more { color: var(--brand); background: var(--brand-soft); }
 .att-more:hover { transform: translateX(2px); }
 
-.sk {
-  height: 110px; border-radius: var(--r-lg);
-  border: 1px solid var(--line);
-  background: linear-gradient(100deg, var(--surface-2) 30%, var(--surface-3) 50%, var(--surface-2) 70%);
-  background-size: 220% 100%;
-  animation: sh 1.4s linear infinite;
-}
-@keyframes sh { to { background-position: -220% 0; } }
+/* 骨架屏：形状按真实景点卡片摆（标题条 + 两行描述 + 右侧勾选圈）。
+   .sk-line / .sk-tick 的底色与 shimmer 动画是通用的，定义在 style.css */
+.sk-att { pointer-events: none; }
+.sk-w60 { width: 60%; }
+.sk-w90 { width: 90%; }
+.sk-w45 { width: 45%; margin-top: 7px; }
 .hint { font-size: 13px; color: var(--ink-3); text-align: center; margin-top: 22px; }
 .hint code { background: var(--surface-3); padding: 2px 6px; border-radius: 5px; font-size: 12.5px; color: var(--ink-2); }
 
@@ -724,22 +803,49 @@ watch(city, load)
    手机形态：设置面板变成底部浮条
    ================================================================ */
 @media (max-width: 640px) {
-  .mode-tabs { margin: 0 var(--gutter) 11px; }
+  .mode-tabs { margin: 0 var(--gutter) 11px; flex-shrink: 0; }
   .mode-tab { padding: 7.5px 10px; font-size: 13px; }
   .auto-wrap { padding: 0 var(--gutter) 24px; }
   .auto-card { padding: 16px; gap: 11px; }
   .auto-title { font-size: 16px; }
 
-  .pick-layout { display: block; padding-bottom: 100px; }
-  .pick-bar { padding: 11px 0 3px; font-size: 12px; }
-  .att-grid { display: flex; flex-direction: column; gap: 9px; padding-top: 8px; }
+  /* 景点页同样「固定头部 + 列表自己滚」：mode-tabs / 检索栏 / 区域筛选都固定，
+     只有 .att-grid 滚动。底部 100px 给 fixed 的设置浮条让位 */
+  .pick-layout {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    padding: 0 var(--gutter);
+  }
+  .pick-main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .pick-bar { padding: 11px 0 3px; font-size: 12px; flex-shrink: 0; }
+  /* 区域筛选：单行横向滚动 —— 标签再多也不会换行把景点列表顶下去 */
+  .area-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+    flex-shrink: 0;
+  }
+  .area-chips::-webkit-scrollbar { display: none; }
+  .area-chip { flex-shrink: 0; }
+  .att-search { margin-bottom: 9px; flex-shrink: 0; }
+  .att-grid {
+    flex: 1; min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex; flex-direction: column; gap: 9px;
+    /* 底部 100px 给 fixed 的设置浮条让位。必须写在滚动容器**内部** ——
+       写在外层 .pick-layout 上会变成一块不随滚动的死空白（用户反馈） */
+    padding: 8px 0 100px;
+  }
   .att { padding: 13px 14px 12px; border-radius: var(--r); }
   .att:hover { transform: none; box-shadow: var(--sh-1); }
   .att-name { font-size: 15.5px; }
   .att-intro { font-size: 12.5px; margin: 6px 0 8px; line-height: 1.6; }
   .tick { width: 22px; height: 22px; font-size: 12px; }
   .tick.on { box-shadow: 0 0 0 3px var(--brand-soft); }
-  .sk { height: 96px; }
+  .sk-att .sk-line { height: 9px; margin-top: 8px; }
 
   .pick-side { position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 30; }
   .pick-panel {

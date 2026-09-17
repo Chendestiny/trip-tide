@@ -42,7 +42,14 @@ class City(Base):
     pinyin: Mapped[str] = mapped_column(String(32), default="", comment="拼音，供前端路由/搜索")
     emoji: Mapped[str] = mapped_column(String(8), default="", comment="宫格图标")
     tagline: Mapped[str] = mapped_column(String(64), default="", comment="一句话卖点")
-    heat: Mapped[int] = mapped_column(Integer, default=0, comment="城市热度，宫格排序用")
+    heat: Mapped[int] = mapped_column(Integer, default=0, comment="城市热度，宫格排序并列时的兜底")
+    rank_score: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
+        comment="首页排序分：前 8 个高热度景点的指数加权和（第 1 名 ×1.5、第 2/3 名 ×1.2）。"
+        "由 service.recompute_rank_scores() / scripts/rank_cities.py 重算，改了景点必须重算",
+    )
     kind: Mapped[str] = mapped_column(
         String(10), default="city",
         comment="目的地类型：city=城市+周边（现状）；region=区域游（贵州，多基地环线）",

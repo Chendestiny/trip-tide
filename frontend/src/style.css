@@ -1,5 +1,5 @@
 /* ============================================================
-   TripTide 设计系统
+   AI 旅行搭子 设计系统
 
    断点策略（桌面优先）：
      默认      → 宽屏网页版：1120px 居中容器、多列栅格、右侧粘性面板
@@ -176,7 +176,7 @@ a { color: inherit; }
   transition: background 0.18s var(--ease), color 0.18s var(--ease);
 }
 .back-link:hover { background: var(--surface-3); color: var(--ink); }
-.back-arrow { font-size: 17px; line-height: 1; margin-top: -2px; }
+.back-arrow { width: 16px; height: 16px; flex-shrink: 0; }
 
 .shell-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .shell-body::-webkit-scrollbar { width: 9px; }
@@ -186,6 +186,36 @@ a { color: inherit; }
 }
 .shell-body::-webkit-scrollbar-thumb:hover { background: var(--ink-4); background-clip: content-box; }
 .shell-body::-webkit-scrollbar-track { background: transparent; }
+
+/* 手机端：首页与景点页用「固定头部 + 内容区自己滚」的 App 形态。
+   用 :has 限定，只对这两个页面生效 —— 行程结果页 / 我的页保持整页滚动 */
+@media (max-width: 640px) {
+  .shell-body:has(> .home),
+  .shell-body:has(> .pick-layout) {
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+}
+
+/* ================================================================
+   骨架屏：按真实卡片的形状摆位（emoji 方块 / 标题条 / 描述条），
+   比一个纯色块更接近成品，加载完切换时跳动更小
+   ================================================================ */
+.sk-emoji, .sk-line, .sk-tick {
+  display: block;
+  background: linear-gradient(100deg, var(--surface-2) 30%, var(--surface-3) 50%, var(--surface-2) 70%);
+  background-size: 220% 100%;
+  animation: sk-shimmer 1.4s linear infinite;
+}
+.sk-emoji { width: 44px; height: 44px; border-radius: 11px; }
+.sk-line { height: 10px; border-radius: 5px; margin-top: 10px; }
+.sk-tick { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; }
+
+@keyframes sk-shimmer { to { background-position: -220% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-emoji, .sk-line, .sk-tick { animation: none; }
+}
 
 /* ================================================================
    按钮
@@ -359,7 +389,7 @@ a { color: inherit; }
   .shell-sub { font-size: 12px; margin-left: 5px; }
   .back-link { padding: 5px 7px; margin-left: -4px; }
   .back-link .back-text { display: none; }
-  .back-arrow { font-size: 20px; }
+  .back-arrow { width: 19px; height: 19px; }
 
   .tabbar { display: flex; }
 

@@ -1,0 +1,88 @@
+/* AI 旅行搭子 小程序端全局样式
+ *
+ * ⚠️ WXSS 与 Web 的 style.css 是两套：选择器受限（不支持后代选择器的部分写法）、
+ * 单位建议用 rpx。所以「样式复用」做不到，只能从 utils/theme.js 取**颜色常量**。
+ * 品牌主色 #0E7C86 与 Web 版一致（index.html 的 theme-color）。
+ */
+
+page {
+  background: #f7f5f0;
+  color: #23323a;
+  font-size: 28rpx;
+  line-height: 1.6;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.page {
+  padding: 32rpx 28rpx 64rpx;
+}
+
+.hero {
+  padding: 16rpx 8rpx 32rpx;
+}
+
+.title {
+  display: block;
+  font-size: 44rpx;
+  font-weight: 500;
+  color: #0e7c86;
+}
+
+.sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #6b7c85;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.label {
+  display: block;
+  font-size: 24rpx;
+  color: #6b7c85;
+  margin-bottom: 12rpx;
+}
+
+.mono {
+  display: block;
+  font-family: Consolas, Menlo, monospace;
+  font-size: 26rpx;
+  color: #23323a;
+  word-break: break-all;
+}
+
+.hint {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #8a9aa3;
+}
+
+.err {
+  color: #c0392b;
+  font-size: 26rpx;
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.chip {
+  padding: 14rpx 22rpx;
+  border-radius: 14rpx;
+  background: #e6f2f3;
+}
+
+.chip-sub {
+  margin-left: 10rpx;
+  font-size: 22rpx;
+  color: #4a7c82;
+}

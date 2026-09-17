@@ -19,12 +19,15 @@
 from __future__ import annotations
 
 import logging
+import time
+from collections.abc import Iterable
 from datetime import datetime
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.trip import llm, planner, tools
 from app.trip.models import Attraction, City, Spot, TripPlan
 from app.trip.schemas import (
@@ -43,6 +46,13 @@ from app.trip.schemas import (
 )
 
 logger = logging.getLogger("triptide.service")
+
+# 首页目的地宫格的进程内缓存：{key: (写入时刻 monotonic, 结果)}。
+# 目的地/景点只在 seed 时变化，而前端每次进首页都会调 `/cities`；
+# 库在远端（一个来回约 40ms），缓存命中时该接口不查库。
+# TTL 见 core/config.py 的 `cities_cache_ttl`；seed 完会「重算排序分 + 清缓存」。
+_CITIES_CACHE_KEY = "all"
+_CITIES_CACHE: dict[str, tuple[float, list[CityOut]]] = {}
 
 
 # ================================================================ 查询
@@ -64,12 +74,118 @@ def resolve_city(db: Session, key: str) -> City:
     return city
 
 
+def clear_cities_cache() -> None:
+    """让下一次 `list_cities()` 重新读库。seed / 重算排序分之后调用。"""
+    _CITIES_CACHE.clear()
+
+
+# ---------------------------------------------------------------- 首页排序分
+# 排序键 = 每个目的地「前 RANK_TOP 个高热度景点」的**指数加权**热度之和：
+#
+#     score = Σ_{i=1..min(RANK_TOP, n)}  heat_i × RANK_DECAY^(i-1) × B_i
+#     其中 B_1 = RANK_FIRST_BOOST(1.5)，B_2 = B_3 = RANK_TOP3_BOOST(1.2)，其余 = 1
+#
+# 为什么不是简单求和（原来就是「前 10 之和」）：库里曾有 30 个目的地恰好只有 8 个景点
+# ——那是 seed 给名单时的默认规模，不代表这地方只有 8 个可玩的。简单求和时，
+# 这 30 个的「前 10 之和」就等于「全部景点之和」，截断没生效 → 排序键退化成
+# 「景点数量 × 人均热度」，而「景点数量」这一半信号是数据录得全不全，不是值不值得去。
+#
+# 取 RANK_TOP=8 而非 10：8 正好是当时那 30 个目的地的实际条目数 → 68 个里 **64 个能凑满 8 条**，
+# 绝大多数目的地在同一个基数上比（不足 8 条的从 35 个降到 4 个）。
+# 实测（68 个目的地，逐个目的地的名次见 `scripts/check_rank.py`、重算见 `scripts/rank_cities.py`）：
+#
+#     | 口径                            | ρ(名次, 景点数量) | 洛阳 | 北疆 | 拉萨 | 深圳 | 桂西南 |
+#     | 前10之和（最旧）                 |     +0.858       |  21  |  53  |   9  |  32  |   44   |
+#     | 前8之和                          |     +0.770       |  12  |  52  |   5  |  44  |   60   |
+#     | 前8 + 指数加权（前三都×1.3）       |     +0.714       |   9  |  37  |   5  |  53  |   64   |
+#     | 前8 + 指数加权（w1=1.5, w2/3=1.2）|     +0.538*      |   8  |  15  |   5  |  60  |   64   |
+#
+#     * 0.538 是**补齐景点数据之后**的值；「前三都×1.3」的口径在补齐前是 0.714、补齐后 0.541 ——
+#       两列不可直接比，看趋势即可：补数据与调权重都在把 ρ 往 0 压。
+#
+# 「第 1 名单独抬到 1.5、第 2/3 名降到 1.2」是用户 2026-09-17 定的：更看重
+# 「有没有一张顶级名片」，少看「前三整体」。实测影响温和：前 7 名不变，
+# 洛阳 9→8（反超南京）、泰安 58→53（泰山 720 拿到 1.5）、长沙 16→19；ρ 0.541 → 0.538。
+# ⚠️ ρ 必须用**平均秩**处理并列：库里大量目的地挤在同一个景数档（曾 30 个都是 8 景，
+# 补齐后 26 个都是 10 景），不处理并列会把这批排成一条假斜坡，把 ρ 抬到 0.95
+# （我第一版就是这么算错的）。`scripts/check_rank.py` 里已按平均秩实现。
+# ⚠️ RANK_DECAY 在 **0.85~0.95 之间对前 20 的名单没有任何影响**（只差南京/杭州互换一次），
+# 所以刻意不暴露成配置项 —— 本仓库已有 6 个零引用的死配置，不再增加。
+RANK_TOP = 8
+RANK_DECAY = 0.9
+RANK_FIRST_BOOST = 1.5
+RANK_TOP3_BOOST = 1.2
+
+
+def rank_score(heats: Iterable[int]) -> int:
+    """单个目的地的排序分。纯函数，`recompute_rank_scores()` 与诊断脚本共用。"""
+    total = 0.0
+    for i, heat in enumerate(sorted(heats, reverse=True)[:RANK_TOP]):
+        weight = RANK_DECAY ** i
+        if i == 0:
+            weight *= RANK_FIRST_BOOST    # 第 1 名 = 这座城市的名片，权重最高
+        elif i < 3:
+            weight *= RANK_TOP3_BOOST     # 第 2、3 名
+        total += heat * weight
+    return round(total)
+
+
+def recompute_rank_scores(db: Session) -> int:
+    """重算所有目的地的 `City.rank_score` 并落库，返回被改动的条数。
+
+    **什么时候必须调**：① seed 写完景点之后（`seed.main` 已自动调）
+    ② 手工改过 `trip_attraction.heat` / 增删过景点之后。
+    漏调**不会报错**，但首页顺序会和实际数据对不上 —— 所以 `scripts/check_rank.py`
+    专门做了「库里存的值 vs 现算的值」一致性校验，把它变成可检测的问题。
+    """
+    by_city: dict[int, list[int]] = {}
+    for city_id, heat in db.execute(select(Attraction.city_id, Attraction.heat)).all():
+        by_city.setdefault(int(city_id), []).append(int(heat))
+
+    changed = 0
+    for city in db.scalars(select(City)).all():
+        score = rank_score(by_city.get(city.id, []))
+        if city.rank_score != score:
+            city.rank_score = score
+            changed += 1
+    db.commit()
+    clear_cities_cache()
+    return changed
+
+
 def list_cities(db: Session) -> list[CityOut]:
-    cities = db.scalars(select(City).order_by(City.heat.desc())).all()
-    return [
-        CityOut.model_validate({**c.__dict__, "attraction_count": len(c.attractions)})
-        for c in cities
-    ]
+    """首页目的地宫格。
+
+    一条 SQL：`LEFT JOIN` 数出每个目的地的景点数，再按**预存的** `City.rank_score` 排序
+    （排序分由 `recompute_rank_scores()` 维护，seed 会自动重算；口径见上面 RANK_* 的注释）。
+
+    ⚠️ 排序分**预存**而不是每次现算，不是为了省时间 —— 现算也就一条窗口函数查询，
+    耗时几乎全在那个网络往返上（库在远端，实测单条 41ms）。预存是为了
+    **能反复调口径、并且能人工看/人工改**。代价是「改了景点忘记重算」会静默不一致，
+    由 `scripts/check_rank.py` 的一致性校验兜着。
+
+    并列时回落 `City.heat`，最后 `City.id` 兜底（末位 tie-break 必须显式写，
+    否则同分城市的顺序不稳定）。结果进进程内缓存（`settings.cities_cache_ttl`）。
+    """
+    cached = _CITIES_CACHE.get(_CITIES_CACHE_KEY)
+    if cached and time.monotonic() - cached[0] < settings.cities_cache_ttl:
+        return cached[1]
+
+    rows = db.execute(
+        select(City, func.count(Attraction.id))
+        .outerjoin(Attraction, Attraction.city_id == City.id)
+        .group_by(City.id)
+        .order_by(City.rank_score.desc(), City.heat.desc(), City.id.asc())
+    ).all()
+
+    out: list[CityOut] = []
+    for city, count in rows:
+        item = CityOut.model_validate(city)
+        item.attraction_count = int(count or 0)
+        out.append(item)
+
+    _CITIES_CACHE[_CITIES_CACHE_KEY] = (time.monotonic(), out)
+    return out
 
 
 def list_attractions(db: Session, city_key: str) -> list[AttractionOut]:
@@ -161,12 +277,17 @@ def preview_plan(db: Session, req: PlanRequest) -> PlanPreview:
     # 「按片区排最舒服需要几天」——只作提示，不作判定依据（簇是可以合并的）
     days_needed = planner.estimate_days_needed(city, kept, req.transport)
 
+    # 逐天裁剪必须**与真实生成同口径**：trim 的往返要按「当天住宿片区」算，
+    # 不能退回市中心 —— region（环线）目的地的中心到景点动辄几百公里，
+    # 不传 origin 会把莫高窟这种走廊两端的景点误判成「装不下」（实测踩过）。
+    hotels = planner.plan_hotels(city, groups)
     visit_total = 0
     travel_total = 0
     per_day: list[dict] = []
     for idx, group in enumerate(groups, start=1):
         budget = planner.day_budget(req, idx, days)
-        day_kept, spilled = planner.trim_day(city, group, req, budget)
+        origin = planner._hotel_origin(city, hotels[idx - 1])
+        day_kept, spilled = planner.trim_day(city, group, req, budget, origin=origin)
         for a in spilled:
             will_drop.append(
                 DroppedItem(name=a.name, reason="当天时间装不下", attraction_id=a.id)
@@ -223,7 +344,16 @@ def preview_plan(db: Session, req: PlanRequest) -> PlanPreview:
     pace_label = req.pace_label
     next_hint = "已经是 7 天上限，建议减少景点" if days >= 7 else f"加到 {days + 1} 天"
 
-    if tightness == "轻松":
+    if names and ratio < 1.0:
+        # 有舍弃但日均并不超标 —— 原因是「路程太远 / 单点太长」，
+        # 别再说「远超目标」（日均 240 分钟却喊远超 450，自相矛盾，实测踩过）。
+        tail = f"，会舍弃 {len(names)} 个（{short}）"
+        suggestion = (
+            f"{n_sel} 个景点摊到 {days} 天，日均游览约 {avg_visit:.0f} 分钟，本不算多{tail}。"
+            f"装不下的原因是路程太远或单点耗时太长，加天数也未必解决，"
+            f"建议把远郊点换成近郊的，或单独安排一天。"
+        )
+    elif tightness == "轻松":
         suggestion = (
             f"{n_sel} 个景点摊到 {days} 天，日均游览约 {avg_visit:.0f} 分钟，"
             f"低于「{pace_label}」的 {target} 分钟目标 —— 安排偏松。"
@@ -268,16 +398,24 @@ def preview_plan(db: Session, req: PlanRequest) -> PlanPreview:
 
 # ================================================================ 生成
 def audit_plan(plan: PlanResult, req: PlanRequest) -> list[str]:
-    """落库前的最后一道硬编码复核。只记日志、不改内容。"""
+    """落库前的最后一道硬编码复核。只记日志、不改内容。
+
+    ⚠️ 别把「同一天内出现两次」当重复：景点跨午饭会被**有意**拆成
+    「上午段 + 下午继续」两个同名节点（见 `planner.materialize_day` 的跨午饭拆分），
+    它们的 `attraction_id` 相同。只有**跨天**重复才是真问题。
+    以前这里不区分，导致任何带长景点的方案都会稳定报「落库前复核发现 1 处问题」，
+    而文档说这行「正常应为 0」—— 一个永远修不掉的假警报会让人忽略真问题。
+    """
     issues: list[str] = []
     seen: dict[int, int] = {}
     for dp in plan.day_plans:
         issues.extend(f"Day {dp.day}: {x}" for x in tools.audit_day(dp, req))
         for n in dp.nodes:
             if n.type == "attraction" and n.attraction_id is not None:
-                if n.attraction_id in seen:
+                prev_day = seen.get(n.attraction_id)
+                if prev_day is not None and prev_day != dp.day:
                     issues.append(
-                        f"景点「{n.name}」在 Day {seen[n.attraction_id]} 与 Day {dp.day} 重复"
+                        f"景点「{n.name}」在 Day {prev_day} 与 Day {dp.day} 重复"
                     )
                 seen[n.attraction_id] = dp.day
     if issues:

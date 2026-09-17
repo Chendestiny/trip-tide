@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AI 旅行搭子 · 离线演示版</title>
+<!--
+  离线演示版模板（单文件）—— 由 scripts/build_mock_html.py 把
+  frontend/src/engine/*.js（排程引擎）与 frontend/src/engine/offline-data.json（真数据）
+  注入到下面两个占位符里，产出 dist/trip-buddy-mock.html。
+
+  为什么单独写一份 UI 而不是复用 Vue 工程：
+  这是「先看效果」的快速验证件 —— 不需要 npm install / 不需要构建链，改完引擎重跑一个脚本就有新页面。
+  正式的单文件产物走 `npm run build:offline` + `scripts/build_single_html.py`（复用真实 Vue 页面）。
+
+  ⚠️ 本文件的算法部分**不重写**：全部来自 engine/，与后端 planner.py 逐节点一致。
+-->
+<style>
+:root{
+  --bg:#f2f4f3; --surface:#fff; --surface-2:#f8faf9; --line:#e5eae8;
+  --brand:#0d7d86; --brand-dark:#0a5f66; --brand-soft:#e4f2f3; --brand-tint:#f2fafb;
+  --accent:#ff6b35; --gold:#d99b2b;
+  --ink:#101d23; --ink-2:#4b5a62; --ink-3:#8a99a1;
+  --r:11px; --r-lg:14px; --r-xl:19px;
+  --sh-1:0 1px 2px rgba(16,29,35,.05),0 2px 6px rgba(16,29,35,.04);
+  --sh-2:0 6px 18px rgba(16,29,35,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--ink); line-height:1.6; -webkit-font-smoothing:antialiased;
+  padding:0 0 84px;
+}
+.wrap{max-width:760px;margin:0 auto;padding:0 14px}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit}
+
+/* ---------- 顶部 ---------- */
+.top{position:sticky;top:0;z-index:20;background:rgba(242,244,243,.92);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line)}
+.top-in{max-width:760px;margin:0 auto;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.logo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--brand-dark));
+  color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center}
+.top b{font-size:15px;letter-spacing:-.01em}
+
+/* ---------- hero ---------- */
+.hero{margin:14px 0 12px;padding:22px 20px;border-radius:var(--r-xl);color:#fff;
+  background:linear-gradient(135deg,#0d7d86,#08494e);box-shadow:var(--sh-2)}
+.hero h1{font-size:23px;line-height:1.3;font-weight:700;letter-spacing:-.02em}
+.hero p{margin-top:7px;font-size:13px;color:rgba(255,255,255,.86)}
+.hero .cta{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+.hero .cta button{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);color:#fff;
+  border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;backdrop-filter:blur(6px)}
+.hero .cta button.solid{background:#fff;color:var(--brand-dark)}
+
+/* ---------- 通用块 ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-1);padding:14px;margin-bottom:12px}
+.sec{font-size:12px;font-weight:700;color:var(--ink-3);letter-spacing:.06em;margin:16px 2px 8px}
+.row{display:flex;align-items:center;gap:8px}
+.spread{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.muted{color:var(--ink-3);font-size:12.5px}
+
+/* ---------- tab / chip ---------- */
+.tabs{display:flex;gap:4px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:999px;padding:3px;width:fit-content}
+.tabs button{padding:6px 16px;border-radius:999px;font-size:13px;color:var(--ink-2)}
+.tabs button.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:var(--sh-1)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 13px;
+  font-size:12.5px;color:var(--ink-2)}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.tag{background:var(--surface-3,#eef1f0);border-radius:6px;padding:1px 6px;font-size:11px;color:var(--ink-2)}
+.tag.must{background:#fff0e9;color:#c8481a;font-weight:600}
+
+/* ---------- 搜索 ---------- */
+.search{position:relative;margin:10px 0}
+.search input{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:999px;
+  padding:10px 14px 10px 34px;font-size:13.5px;outline:none}
+.search .ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--ink-3);font-size:13px}
+
+/* ---------- 城市宫格 ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.city{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:13px;box-shadow:var(--sh-1);transition:.14s}
+.city:hover{transform:translateY(-1px);box-shadow:var(--sh-2);border-color:#cfe6e8}
+.city .e{font-size:22px}
+.city .n{margin-top:5px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:6px}
+.city .t{margin-top:3px;font-size:12.5px;color:var(--ink-2);min-height:34px}
+.city .c{margin-top:6px;font-size:11.5px;color:var(--ink-3)}
+
+/* ---------- 设置行 ---------- */
+.setrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.setrow:last-child{border-bottom:none}
+.setrow .lb{width:72px;flex-shrink:0;font-size:13px;color:var(--ink-2)}
+.stepper{display:flex;align-items:center;gap:10px}
+.stepper button{width:28px;height:28px;border-radius:8px;border:1px solid var(--line);
+  background:var(--surface-2);font-size:16px;line-height:1;color:var(--ink-2)}
+.stepper b{min-width:26px;text-align:center;font-size:15px}
+input[type=time]{border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px;background:var(--surface-2)}
+
+/* ---------- 预估 ---------- */
+.est{border-radius:var(--r-lg);padding:12px 14px;margin-bottom:12px;border:1px solid var(--line);background:var(--surface)}
+.est.t-轻松{background:#effaf3;border-color:#c9ecdb}
+.est.t-适中{background:var(--brand-tint);border-color:#cfe6e8}
+.est.t-紧凑{background:#fdf6e6;border-color:#f0e0bb}
+.est.t-超载{background:#fff0e9;border-color:#f7d3c3}
+.est .hd{display:flex;align-items:center;gap:8px}
+.est .lv{font-weight:700;font-size:13.5px}
+.est .cnt{margin-left:auto;font-size:12.5px;color:var(--ink-2)}
+.est p{margin-top:6px;font-size:12.5px;color:var(--ink-2)}
+
+/* ---------- 景点列表 ---------- */
+.att{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+.att:last-child{border-bottom:none}
+.att .bx{width:20px;height:20px;flex-shrink:0;margin-top:2px;border:1.5px solid var(--line-2,#d3dbd8);
+  border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;background:var(--surface)}
+.att.on .bx{background:var(--brand);border-color:var(--brand)}
+.att .bd{flex:1;min-width:0}
+.att .nm{font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.att .meta{margin-top:3px;font-size:12px;color:var(--ink-3);display:flex;gap:8px;flex-wrap:wrap}
+.att .intro{margin-top:4px;font-size:12.5px;color:var(--ink-2)}
+.att .det{margin-top:6px;font-size:12px;color:var(--brand-dark);cursor:pointer}
+.spots{margin-top:7px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px}
+.spots .sp{padding:6px 0;border-bottom:1px dashed var(--line)}
+.spots .sp:last-child{border-bottom:none}
+.spots .sp b{font-size:12.5px}
+.spots .sp p{font-size:12px;color:var(--ink-2);margin-top:2px}
+
+/* ---------- 方案 ---------- */
+.sum{font-size:13.5px;line-height:1.75;color:var(--ink-2)}
+.sum strong{color:var(--ink)}
+.day{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-1);margin-bottom:12px;overflow:hidden}
+.day-h{padding:12px 14px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.day-h .r1{display:flex;align-items:center;gap:8px}
+.day-no{width:26px;height:26px;border-radius:8px;color:#fff;font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
+.pace{font-size:11px;border-radius:999px;padding:2px 9px;font-weight:600}
+.day-h .th{margin-top:6px;font-size:13px;color:var(--ink-2)}
+.day-h .nums{margin-top:7px;display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink-3)}
+.day-b{padding:10px 14px 14px}
+.nd{display:flex;gap:10px;padding:9px 0}
+.nd .tm{width:44px;flex-shrink:0;font-size:12.5px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.nd .rail{width:20px;flex-shrink:0;display:flex;flex-direction:column;align-items:center}
+.nd .dot{width:20px;height:20px;border-radius:50%;background:var(--surface-3,#eef1f0);
+  display:flex;align-items:center;justify-content:center;font-size:11px}
+.nd .ln{flex:1;width:2px;background:var(--line);margin:2px 0}
+.nd .bd{flex:1;min-width:0}
+.nd .nm{font-size:13.5px;font-weight:600}
+.nd .adv{margin-top:2px;font-size:12px;color:var(--ink-2)}
+.nd .tv{margin-top:2px;font-size:11.5px;color:var(--ink-3)}
+.nd.moved .nm::after{content:"已挪至";margin-left:6px;font-size:11px;color:var(--accent)}
+
+/* ---------- 地图示意 ---------- */
+.svgmap{margin:10px 14px 4px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2)}
+.svgmap text{font-size:9.5px;fill:var(--ink-2)}
+.svgmap .num{fill:#fff;font-size:9px;font-weight:700}
+.legend{margin:0 14px 12px;font-size:11.5px;color:var(--ink-3)}
+
+/* ---------- 底部操作条 ---------- */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(255,255,255,.95);
+  backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:10px 14px}
+.bar-in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:10px}
+.bar .info{font-size:12.5px;color:var(--ink-2)}
+.btn{border-radius:11px;padding:11px 16px;font-size:14px;font-weight:600;background:var(--brand);color:#fff}
+.btn:disabled{opacity:.45}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2,#d3dbd8);color:var(--ink-2);font-weight:500}
+.btn.accent{background:var(--accent)}
+.btn.sm{padding:8px 13px;font-size:13px;border-radius:9px}
+.foot{margin:18px 2px 6px;font-size:11.5px;color:var(--ink-3);line-height:1.7}
+.note{background:var(--brand-tint);border:1px solid #cfe6e8;border-radius:var(--r);padding:10px 12px;
+  font-size:12.5px;color:var(--brand-dark);margin-bottom:12px}
+
+/* ---------- 宽屏（≥900px）：真正的网页版双栏 ---------- */
+@media (min-width:900px){
+  .wrap{max-width:1120px}
+  .hero{padding:40px 40px 34px}
+  .hero h1{font-size:31px}
+  .hero p{font-size:14.5px;max-width:660px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(245px,1fr))}
+  /* 选景点：左设置+预估（粘性），右景点池 */
+  .pick-cols{display:grid;grid-template-columns:350px minmax(0,1fr);gap:16px;align-items:start}
+  .pick-side{position:sticky;top:60px}
+  /* 方案：左时间轴，右舍弃/必去/规则说明（粘性） */
+  .plan-cols{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:16px;align-items:start}
+  .plan-side{position:sticky;top:60px}
+  .rules-card li{margin:0 0 8px 1.2em;font-size:12.5px;color:var(--ink-2)}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <span class="logo">🧭</span><b>AI 旅行搭子</b>
+</div></div>
+<div class="wrap" id="app"></div>
+<div class="bar" id="bar" style="display:none"><div class="bar-in" id="barin"></div></div>
+
+<script type="module">
+/* ============================================================================
+   ① 内联数据（构建期从种子生成，68 目的地 / 899 景点 / 1724 子景点）
+   ============================================================================ */
+const DATA = /*__DATA__*/;
+
+/* ============================================================================
+   ② 排程引擎 —— frontend/src/engine/*.js 的原文（import/export 由构建脚本剥掉）
+      与后端 backend/app/trip/planner.py 逐节点一致，靠 local/offline-diff.py 守着。
+   ============================================================================ */
+const ENGINE = (() => {
+/*__ENGINE__*/
+  return { planFallback, pickAttractions, previewPlan, PACE_LABELS, TRANSPORT_LABELS,
+           dayBudget, dayWindow, haversineM, haversineKm: (a,b,c,d) => haversineM(a,b,c,d)/1000 };
+})();
+
+/* ============================================================================
+   ③ 页面逻辑（这一层是 mock 专用的薄壳，正式版是 Vue 页面）
+   ============================================================================ */
+const CITIES = DATA.cities;
+const ATTRACTIONS = DATA.attractions;
+const byCity = new Map();
+for (const a of ATTRACTIONS) (byCity.get(a.city_id) || byCity.set(a.city_id, []).get(a.city_id)).push(a);
+const cityByName = (n) => CITIES.find((c) => c.name === n);
+
+const S = {
+  view: 'home', tab: 'city', q: '',
+  city: null, picked: new Set(),
+  days: 2, pace: 'balanced', transport: 'mixed',
+  start: '09:00', ret: '19:30',
+  plan: null, openSpots: new Set(),
+};
+
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const $ = (id) => document.getElementById(id);
+const hhmm = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const DAY_COLORS = ['#0d7d86', '#ff6b35', '#7c5ce0', '#d99b2b', '#2f8f4e', '#c8481a', '#3d7eff'];
+const color = (d) => DAY_COLORS[(d - 1) % DAY_COLORS.length];
+const PACE_STYLE = { 轻松: ['#effaf3', '#1c7f4d'], 适中: ['#f2fafb', '#0a5f66'], 紧凑: ['#fdf6e6', '#8a6412'] };
+const NODE_ICON = { depart: '🚩', attraction: '📍', meal: '🍜', hotel: '🏨', transit: '🚶' };
+
+function buildReq(ids) {
+  return {
+    city: S.city.name, attraction_ids: ids, days: S.days,
+    start_time: S.start, return_time: S.ret,
+    transport: S.transport, pace: S.pace,
+    transport_label: ENGINE.TRANSPORT_LABELS[S.transport],
+    pace_label: ENGINE.PACE_LABELS[S.pace],
+  };
+}
+const selectedList = () => (byCity.get(S.city.id) || []).filter((a) => S.picked.has(a.id));
+
+/* ---------------------------------------------------------------- 首页 */
+function viewHome() {
+  const kw = S.q.trim().toLowerCase();
+  const list = CITIES.filter((c) => (c.kind || 'city') === S.tab).filter((c) => {
+    if (!kw) return true;
+    return [c.name, c.pinyin, c.tagline, c.region].filter(Boolean).join(' ').toLowerCase().includes(kw);
+  });
+  const cards = list.map((c) => `
+    <button class="city" data-city="${esc(c.name)}">
+      <div class="e">${c.emoji || '📍'}</div>
+      <div class="n">${esc(c.name)}${c.kind === 'region' ? '<span class="tag">环线</span>' : ''}</div>
+      <div class="t">${esc(c.tagline || '')}</div>
+      <div class="c">${c.attraction_count} 个景点 · ${esc(c.region || '')}</div>
+    </button>`).join('');
+
+  return `
+    <div class="hero">
+      <h1>选个城市，剩下的交给它</h1>
+      <p>勾选想去的景点，自动排出按天路线：顺路不折返、饭点自动插餐、给出住宿片区与取舍理由。</p>
+      <div class="cta">
+        <button class="solid" data-demo="1">✨ 一键看示例</button>
+        <button data-tab="region">看看区域环线</button>
+      </div>
+    </div>
+    <div class="card" style="padding:12px 14px">
+      <div class="spread" style="flex-wrap:wrap">
+        <div class="tabs">
+          <button class="${S.tab === 'city' ? 'on' : ''}" data-tab="city">城市</button>
+          <button class="${S.tab === 'region' ? 'on' : ''}" data-tab="region">区域</button>
+        </div>
+        <span class="muted">共 ${list.length} 个${kw ? '（已筛选）' : ''}</span>
+      </div>
+      <div class="search">
+        <span class="ico">🔍</span>
+        <input id="q" placeholder="${S.tab === 'city' ? '搜索城市名或拼音' : '搜索区域'}" value="${esc(S.q)}">
+      </div>
+    </div>
+    <div class="grid">${cards || '<p class="muted">没有匹配的目的地</p>'}</div>
+    <p class="foot">
+      数据：${CITIES.length} 个目的地 / ${ATTRACTIONS.length} 个景点，全部预存在这个 HTML 里。<br>
+      排程在你的浏览器里算（和后端同一套规则），不联网、不调模型、不上传任何数据。
+    </p>`;
+}
+
+/* ---------------------------------------------------------------- 选景点 */
+function viewPick() {
+  const pool = byCity.get(S.city.id) || [];
+  const sel = selectedList();
+  const est = sel.length ? ENGINE.previewPlan(S.city, sel, buildReq([...S.picked])) : null;
+
+  const estHtml = est ? `
+    <div class="est t-${est.tightness}">
+      <div class="hd"><span class="lv">${est.tightness}</span>
+        <span class="cnt">排入 ${est.scheduled_count}/${est.selected_count} · 最少要 ${est.days_needed} 天</span></div>
+      <p>${esc(est.suggestion)}</p>
+    </div>` : `<div class="note">勾几个景点，这里会实时告诉你 ${S.days} 天够不够。</div>`;
+
+  const att = pool.map((a) => {
+    const on = S.picked.has(a.id);
+    const far = a.distance_km >= 45 ? '远郊·可就近住' : a.distance_km >= 30 ? '周边' : '';
+    const spots = S.openSpots.has(a.id) && a.spots.length ? `
+      <div class="spots">${a.spots.map((s) => `
+        <div class="sp"><b>${esc(s.name)}</b>${s.stay_minutes ? `<span class="muted"> · 建议 ${s.stay_minutes} 分钟</span>` : ''}
+        <p>${esc(s.guide || '')}</p></div>`).join('')}</div>` : '';
+    return `
+      <div class="att ${on ? 'on' : ''}" data-att="${a.id}">
+        <div class="bx" data-pick="${a.id}">${on ? '✓' : ''}</div>
+        <div class="bd">
+          <div class="nm">${esc(a.name)}
+            ${a.must_visit || a.heat >= 500 ? '<span class="tag must">必去</span>' : ''}
+            ${a.best_time === 'morning' ? '<span class="tag">早场</span>' : ''}
+            ${a.best_time === 'night' ? '<span class="tag">夜景</span>' : ''}
+            ${a.best_time === 'museum' ? '<span class="tag">闭馆早</span>' : ''}
+          </div>
+          <div class="meta">
+            <span>⏱ ${a.visit_minutes} 分钟</span><span>🔥 热度 ${a.heat}</span>
+            ${a.district ? `<span>${esc(a.district)}</span>` : ''}
+            ${far ? `<span>${far} · ${a.distance_km}km</span>` : ''}
+          </div>
+          <div class="intro">${esc(a.intro || '')}</div>
+          ${a.spots.length ? `<div class="det" data-spots="${a.id}">
+            ${S.openSpots.has(a.id) ? '收起内部路线' : `展开内部路线攻略（${a.spots.length} 个子点位）`}</div>` : ''}
+          ${spots}
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="row" style="margin:12px 0 10px">
+      <button class="btn ghost sm" data-home="1">‹ 换目的地</button>
+      <b style="font-size:16px">${esc(S.city.name)}</b>
+      <span class="muted">${pool.length} 个景点</span>
+    </div>
+
+    <div class="pick-cols">
+      <div class="pick-side">
+        <div class="card">
+          <div class="setrow"><span class="lb">玩几天</span>
+            <div class="stepper"><button data-days="-1">−</button><b>${S.days}</b><button data-days="1">＋</button></div>
+            <span class="muted">1~7 天</span></div>
+          <div class="setrow"><span class="lb">节奏</span><div class="chips">
+            ${Object.entries(ENGINE.PACE_LABELS).map(([k, v]) =>
+              `<button class="chip ${S.pace === k ? 'on' : ''}" data-pace="${k}">${v}</button>`).join('')}
+          </div></div>
+          <div class="setrow"><span class="lb">怎么走</span><div class="chips">
+            ${Object.entries(ENGINE.TRANSPORT_LABELS).filter(([k]) => k !== 'taxi').map(([k, v]) =>
+              `<button class="chip ${S.transport === k ? 'on' : ''}" data-transport="${k}">${v}</button>`).join('')}
+          </div></div>
+          <div class="setrow"><span class="lb">每天时间</span>
+            <input type="time" id="start" value="${S.start}"><span class="muted">出发</span>
+            <input type="time" id="ret" value="${S.ret}"><span class="muted">回酒店</span></div>
+        </div>
+        ${estHtml}
+      </div>
+      <div>
+        <div class="spread" style="margin:0 2px 8px">
+          <div class="sec" style="margin:0">景点池 · 按热度排序</div>
+          <button class="btn ghost sm" data-auto="1">✨ 帮我挑</button>
+        </div>
+        <div class="card">${att}</div>
+      </div>
+    </div>
+    <p class="foot">热度是全国统一的 T 级 0~1000；「必去」= 库里标记或热度 ≥ 500。
+      时段标签（早场 / 夜景 / 闭馆早）是硬知识，排程时会强制打头或压尾。</p>`;
+}
+
+/* ---------------------------------------------------------------- 方案 */
+function viewPlan() {
+  const P = S.plan;
+  const res = P.result;
+  const dayCards = res.day_plans.map((dp) => {
+    const pts = dp.nodes.filter((n) => n.type === 'attraction' && n.attraction_id);
+    const uniq = [];
+    for (const n of pts) {
+      const a = ATTRACTIONS.find((x) => x.id === n.attraction_id);
+      if (a && !uniq.some((u) => u.a.id === a.id)) uniq.push({ a, n });
+    }
+    const visitMin = dp.nodes.filter((n) => n.type !== 'transit').reduce((s, n) => s + n.stay_minutes, 0);
+    const [bg, fg] = PACE_STYLE[dp.pace] || PACE_STYLE['适中'];
+    return `
+      <div class="day">
+        <div class="day-h">
+          <div class="r1">
+            <span class="day-no" style="background:${color(dp.day)}">D${dp.day}</span>
+            <b style="font-size:14px">Day ${dp.day}</b>
+            <span class="pace" style="background:${bg};color:${fg}">${dp.pace}</span>
+            <span class="muted" style="margin-left:auto">${uniq.length} 个点位 · 约 ${(visitMin / 60).toFixed(1)}h</span>
+          </div>
+          <div class="th">${esc(dp.theme || '')}</div>
+          <div class="nums">
+            <span>🚩 ${dp.nodes[0] ? dp.nodes[0].time : ''} 出发</span>
+            <span>🏨 ${esc(dp.hotel ? dp.hotel.area : '')}</span>
+            <span>🚕 ${[...new Set(dp.nodes.map((n) => n.travel_mode).filter(Boolean))].join(' / ')}</span>
+          </div>
+        </div>
+        ${uniq.length > 1 ? svgMap(uniq, color(dp.day)) : ''}
+        <div class="day-b">
+          ${dp.nodes.map((n, i) => `
+            <div class="nd">
+              <div class="tm">${n.time}</div>
+              <div class="rail"><span class="dot">${NODE_ICON[n.type] || '•'}</span>
+                ${i < dp.nodes.length - 1 ? '<span class="ln"></span>' : ''}</div>
+              <div class="bd">
+                <div class="nm">${esc(n.name)}</div>
+                ${n.advice ? `<div class="adv">${esc(n.advice)}</div>` : ''}
+                <div class="tv">${n.stay_minutes ? `停留 ${n.stay_minutes} 分钟` : ''}
+                  ${n.travel_minutes ? ` · 路上 ${n.travel_minutes} 分钟${n.travel_mode ? '（' + n.travel_mode + '）' : ''}` : ''}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
+  const dropped = res.dropped.length ? `
+    <div class="card"><div class="sec" style="margin-top:0">舍弃的景点（${res.dropped.length}）</div>
+      ${res.dropped.map((d) => `<div style="padding:7px 0;border-bottom:1px solid var(--line)">
+        <b style="font-size:13px">${esc(d.name)}</b>
+        <div class="muted">${esc(d.reason)}</div></div>`).join('')}</div>` : '';
+
+  const side = `
+    <div class="plan-side">
+      ${dropped}
+      ${res.must_visit_reasons.length ? `
+        <div class="card"><div class="sec" style="margin-top:0">必去理由</div>
+          ${res.must_visit_reasons.map((m) => `<div style="padding:6px 0">
+            <b style="font-size:13px">${esc(m.name)}</b>
+            <div class="muted">${esc(m.reason)}</div></div>`).join('')}</div>` : ''}
+      <div class="card"><div class="sec" style="margin-top:0">时间轴是怎么算的</div>
+        <ul class="rules-card" style="margin:0;padding:0;list-style:none">
+          <li>到达 = 上一站离开 + 路程；离开 = 到达 + 停留 —— 时间全部算出来，不会自相矛盾。</li>
+          <li>午餐落在 11:20~14:00，晚餐回到住宿片区才吃；大景点跨饭点会拆成「上午段 + 下午继续」。</li>
+          <li>每天预算 = 出发到返回之间，扣掉当天实际要吃的饭；塞不下的先顺延、最后一天才舍弃。</li>
+          <li>住宿按全程景点的几何中心选片区；当天跑远郊（平均单程 &gt;45km）会建议就近住一晚。</li>
+        </ul>
+      </div>
+    </div>`;
+
+  return `
+    <div class="row" style="margin:12px 0 10px">
+      <button class="btn ghost sm" data-back="1">‹ 改景点</button>
+      <b style="font-size:16px">${esc(res.city)} · ${res.days} 天</b>
+      <span class="tag">规则引擎生成</span>
+    </div>
+    <div class="plan-cols">
+      <div>
+        <div class="card">
+          <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">
+            <span class="tag">${P.attractions.length} 个景点</span>
+            <span class="tag">${esc(P.request.transport_label || '')}</span>
+            <span class="tag">${esc(P.request.pace_label || '')}</span>
+            <span class="tag">${esc(P.request.start_time)} 出发 / ${esc(P.request.return_time)} 回</span>
+          </div>
+          <div class="sum">${esc(res.summary)}</div>
+        </div>
+        ${dayCards}
+      </div>
+      ${side}
+    </div>
+    <p class="foot">
+      时间轴是算出来的：到达 = 上一站离开 + 路程，离开 = 到达 + 停留；
+      饭点按 11:20~14:00（午餐）与 18:00 前后（晚餐）自动插入。<br>
+      离线演示版没有模型参与，文案由规则引擎生成 —— 正式版接 DeepSeek 后会换成 AI 写的方案说明。
+    </p>`;
+}
+
+/** 每日路线示意（离线版没有地图 JS Key，用经纬度直接投影画一张示意图） */
+function svgMap(uniq, stroke) {
+  // PAD 要留够：点位是按经纬度等比投影到画布上的，最边缘的点如果贴着边，
+  // 它上方居中的名字会顶出画布（实测最右侧标签会溢出 5px）
+  const W = 640, H = 230, PADX = 62, PADY = 34;
+  const lats = uniq.map((u) => u.a.lat), lngs = uniq.map((u) => u.a.lng);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const spanLat = Math.max(maxLat - minLat, 1e-4), spanLng = Math.max(maxLng - minLng, 1e-4);
+  const x = (lng) => PADX + ((lng - minLng) / spanLng) * (W - PADX * 2);
+  const y = (lat) => H - PADY - ((lat - minLat) / spanLat) * (H - PADY * 2);
+  const d = uniq.map((u) => `${x(u.a.lng).toFixed(1)},${y(u.a.lat).toFixed(1)}`).join(' ');
+  const dots = uniq.map((u, i) => `
+    <circle cx="${x(u.a.lng).toFixed(1)}" cy="${y(u.a.lat).toFixed(1)}" r="10" fill="${stroke}" stroke="#fff" stroke-width="2"/>
+    <text x="${x(u.a.lng).toFixed(1)}" y="${(y(u.a.lat) + 3.4).toFixed(1)}" class="num" text-anchor="middle">${i + 1}</text>
+    <text x="${x(u.a.lng).toFixed(1)}" y="${(y(u.a.lat) - 15).toFixed(1)}" text-anchor="middle">${esc(u.a.name.slice(0, 7))}</text>`).join('');
+  return `<svg class="svgmap" viewBox="0 0 ${W} ${H}" width="100%" height="230" preserveAspectRatio="xMidYMid meet">
+    <polyline points="${d}" fill="none" stroke="${stroke}" stroke-width="2.4" stroke-linecap="round" opacity=".85"/>
+    ${dots}</svg>
+    <div class="legend">按游览顺序连线（GCJ-02 经纬度等比例投影，非真实路网）</div>`;
+}
+
+/* ---------------------------------------------------------------- 渲染 */
+function render() {
+  const app = $('app'), bar = $('bar'), barin = $('barin');
+  if (S.view === 'home') { app.innerHTML = viewHome(); bar.style.display = 'none'; return; }
+  if (S.view === 'pick') {
+    app.innerHTML = viewPick();
+    const n = S.picked.size;
+    bar.style.display = '';
+    barin.innerHTML = `<span class="info">已选 <b>${n}</b> 个景点 · ${S.days} 天</span>
+      <span style="flex:1"></span>
+      ${n ? '<button class="btn ghost" data-clear="1">清空</button>' : ''}
+      <button class="btn" data-gen="1" ${n ? '' : 'disabled'}>生成行程</button>`;
+    return;
+  }
+  app.innerHTML = viewPlan();
+  bar.style.display = '';
+  barin.innerHTML = `<button class="btn ghost sm" data-home="1">回首页</button>
+    <span class="info">${esc(S.plan.result.city)} · ${S.plan.result.days} 天 · ${S.plan.attractions.length} 景</span>
+    <span style="flex:1"></span>
+    <button class="btn ghost sm" data-back="1">改景点</button>`;
+}
+
+/* ---------------------------------------------------------------- 交互 */
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'q') { S.q = e.target.value; const v = e.target.selectionStart; render(); const el = $('q'); if (el) { el.focus(); el.setSelectionRange(v, v); } }
+});
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'start') { S.start = e.target.value || '09:00'; render(); }
+  if (e.target.id === 'ret') { S.ret = e.target.value || '19:30'; render(); }
+});
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-city],[data-tab],[data-demo],[data-att],[data-pick],[data-spots],' +
+    '[data-days],[data-pace],[data-transport],[data-auto],[data-gen],[data-home],[data-back],[data-clear]');
+  if (!t) return;
+  const d = t.dataset;
+
+  if (d.tab) { S.tab = d.tab; S.q = ''; render(); return; }
+  if (d.demo) { openCity(cityByName('成都'), true); return; }
+  if (d.city) { openCity(cityByName(d.city)); return; }
+  if (d.home) { S.view = 'home'; render(); window.scrollTo(0, 0); return; }
+  if (d.back) { S.view = 'pick'; render(); window.scrollTo(0, 0); return; }
+  if (d.days) { S.days = Math.min(7, Math.max(1, S.days + Number(d.days))); render(); return; }
+  if (d.pace) { S.pace = d.pace; render(); return; }
+  if (d.transport) { S.transport = d.transport; render(); return; }
+  if (d.clear) { S.picked.clear(); render(); return; }
+  if (d.spots) { const id = Number(d.spots); S.openSpots.has(id) ? S.openSpots.delete(id) : S.openSpots.add(id); render(); return; }
+  // 点整行也能勾选（手机上好按）；点复选框走 data-pick，两者行为一致
+  if (d.pick === undefined && d.att) {
+    const id = Number(d.att);
+    S.picked.has(id) ? S.picked.delete(id) : S.picked.add(id);
+    render(); return;
+  }
+  if (d.pick) {
+    const id = Number(d.pick);
+    S.picked.has(id) ? S.picked.delete(id) : S.picked.add(id);
+    render(); return;
+  }
+  if (d.auto) { autoPick(); return; }
+  if (d.gen) { generate(); return; }
+});
+
+function openCity(city, demo = false) {
+  S.city = city; S.picked = new Set(); S.plan = null; S.view = 'pick';
+  // 示例用 3 天：成都 2 天会被容量裁剪掉一半景点，第一天只剩一个远郊独占点，看着很单薄
+  if (demo) { S.days = 3; S.pace = 'balanced'; S.transport = 'mixed'; autoPick(false); return; }
+  render(); window.scrollTo(0, 0);
+}
+
+/** 「帮我挑」= 后端 pick_attractions：必去优先 + 热度降序，累计游览逼近 天数 × 节奏目标 */
+function autoPick(rerender = true) {
+  const pool = byCity.get(S.city.id) || [];
+  const picked = ENGINE.pickAttractions(S.city, pool, S.days, S.pace, S.transport);
+  S.picked = new Set(picked.map((a) => a.id));
+  if (rerender) render();
+  else generate();
+}
+
+function generate() {
+  const sel = selectedList();
+  if (!sel.length) return;
+  const result = ENGINE.planFallback(S.city, sel, buildReq([...S.picked]));
+  result.summary = `${result.summary} （离线演示版：路线由本地规则引擎在你的浏览器里算出）`.slice(0, 300);
+  S.plan = {
+    plan_id: Date.now(), created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    source: 'fallback', title: `${S.city.name} · ${S.days} 天 ${sel.length} 景`,
+    request: buildReq([...S.picked]), result, attractions: sel, review: null, trace: [],
+  };
+  S.view = 'plan'; render(); window.scrollTo(0, 0);
+}
+
+render();
+</script>
+</body>
+</html>

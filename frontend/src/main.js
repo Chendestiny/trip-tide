@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import App from './App.vue'
 import TripHome from './views/trip/TripHome.vue'
 import TripPick from './views/trip/TripPick.vue'
@@ -7,7 +7,7 @@ import TripPlan from './views/trip/TripPlan.vue'
 import TripMe from './views/trip/TripMe.vue'
 import './style.css'
 
-const SITE = 'AI 行程规划师'
+const SITE = 'AI 旅行搭子'
 
 /**
  * 兜底：任何渲染期异常都显示成可见的错误面板，而不是一片白。
@@ -44,7 +44,9 @@ function renderFatal(err, info = '') {
 }
 
 const router = createRouter({
-  history: createWebHistory(),
+  // 离线版是单个 HTML 文件（workbuddy.link/p/{id} 或双击打开），
+  // 深链/刷新时静态托管找不到 /trip/plan 这个路径 → 必须用 hash 路由。
+  history: __OFFLINE__ ? createWebHashHistory() : createWebHistory(),
   routes: [
     { path: '/', redirect: '/trip' },
     { path: '/trip', name: 'trip-home', component: TripHome, meta: { title: SITE } },
@@ -64,14 +66,14 @@ router.afterEach((to) => {
 
 // 路由懒加载/组件解析失败也要可见
 router.onError((err) => {
-  console.error('[TripTide] 路由错误', err)
+  console.error('[AI 旅行搭子] 路由错误', err)
   renderFatal(err, 'router')
 })
 
 const app = createApp(App)
 
 app.config.errorHandler = (err, _instance, info) => {
-  console.error('[TripTide] 渲染错误', err, info)
+  console.error('[AI 旅行搭子] 渲染错误', err, info)
   renderFatal(err, info)
 }
 

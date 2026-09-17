@@ -35,4 +35,9 @@ local/
 # AI 辅助开发（本地工具配置/记忆，不提交）
 # 注意：AGENTS.md 是本项目的 agent 操作手册，需要入库，不要加进来
 .agents/
+.workbuddy/
+.workbuddy-ai/
 CLAUDE.md
+
+# 本机绝对路径/环境细节的临时产物
+.tmp-tracked.txt

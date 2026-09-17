@@ -1,4 +1,4 @@
-"""TripTide 行程规划包。
+"""AI 旅行搭子 行程规划包。
 
 模块职责（精简为 7 个文件）：
     models.py     ORM 三表：city / attraction / trip_plan

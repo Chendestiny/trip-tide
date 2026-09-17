@@ -1,0 +1,11 @@
+.retry {
+  margin-top: 8rpx;
+  background: #0e7c86;
+  color: #ffffff;
+  font-size: 28rpx;
+  border-radius: 16rpx;
+}
+
+.retry::after {
+  border: none;
+}

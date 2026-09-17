@@ -1,4 +1,4 @@
-"""TripTide 后端应用入口。
+"""AI 旅行搭子 后端应用入口。
 
 职责：
   1. 创建 FastAPI 实例、注册 CORS（默认放行 Vite dev server 5173）

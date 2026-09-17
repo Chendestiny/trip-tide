@@ -1,0 +1,17 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#0E7C86",
+    "navigationBarTitleText": "AI 旅行搭子",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F7F5F0",
+    "backgroundTextStyle": "dark"
+  },
+  "networkTimeout": {
+    "request": 200000
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

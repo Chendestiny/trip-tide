@@ -1,4 +1,4 @@
-# AGENTS.md — TripTide 操作手册（给 AI agent 看）
+# AGENTS.md — AI 旅行搭子 操作手册（给 AI agent 看）
 
 本项目是「选城市 → 勾景点 → AI 出按天行程」的规划工具。
 
@@ -12,8 +12,13 @@
 - 改数据结构 → [`docs/PLAN_SCHEMA.md`](docs/PLAN_SCHEMA.md)
 - 对接口 → [`docs/API.md`](docs/API.md)
 
-> ⚠️ **本仓库有多处注释与代码不符**（共 8 处，清单在 `docs/BACKEND.md` 文末）。
+> ⚠️ **本仓库有多处注释与代码不符**（共 10 处，清单在 `docs/BACKEND.md` 文末）。
 > **一律以代码为准**，尤其是「11 个工具」「`LLM_MODE=tools` 开关」「routers 4 个端点」这三条，全是错的。
+>
+> ⚠️ **`deepseek-flash` 默认会思考，思考内容也计入 `max_tokens`。** 预算给小了会返回**空 content**、
+> 报错却是「模型返回内容为空」。关思考的参数是 `thinking: {"type": "disabled"}`
+> —— `enable_thinking: False` 是 DashScope 风格，**DeepSeek 不认**。改 `llm.py` / `_native.py` 前先读
+> `docs/CHANGELOG.md` 的 2026-09-16 第 3 节（一次修活了阶段 ①.5 / ② / ④）。
 
 ---
 
@@ -22,8 +27,11 @@
 ```bash
 cd backend
 venv/Scripts/python -m app.trip.seed --list        # 看库里有没有数据（空=还没初始化）
-curl -s -x "" localhost:8000/api/health            # 看 Key 与库是否就绪
-venv/Scripts/python ../scripts/check_planner.py    # 规则引擎回归（8 个用例）
+curl -s -x "" localhost:8002/api/health            # 看 Key 与库是否就绪
+venv/Scripts/python ../scripts/check_planner.py    # 规则引擎回归（15 个用例）
+venv/Scripts/python ../scripts/check_boundaries.py # 跨目的地重复/归属检查
+venv/Scripts/python ../scripts/rank_cities.py      # 重算首页排序分（改景点后必跑）
+venv/Scripts/python ../scripts/check_rank.py       # 首页排序体检（只读）
 ```
 
 三个都 OK 才算环境就绪。`llm_ready=false` 不是错误——规划会走规则引擎，功能完整。
@@ -43,18 +51,22 @@ venv/Scripts/python ../scripts/check_planner.py    # 规则引擎回归（8 个�
 | `trip/planner.py` | 地理/交通/容量/时段规则 + **时间轴物化（唯一产时间的地方）** | **高**，见铁律 2 |
 | `trip/llm.py` | 两阶段并行流水线 + 提示词 + 终检 | 中，提示词是生成质量的全部 |
 | `trip/service.py` | 业务编排：基线 → 流水线 → 终检 → 落库；紧凑度预估；倾向微调 | 中 |
-| `trip/routers.py` | **7 条** HTTP 路由，只做协议与参数校验 | 低 |
-| `trip/amap.py` | 高德客户端。**只有 `search_poi()` 在用**（seed 补坐标），`search_around`/`search_restaurants` 无调用方 | 中 |
-| `trip/seed.py` | 一次性数据初始化（会打外部 API，有 0.25s 串行节流） | 低 |
+| `trip/routers.py` | **9 条** HTTP 路由，只做协议与参数校验 | 低 |
+| `trip/amap.py` | 高德客户端。**主路径是 `search_address()`（地理编码，15 万/月）**，`search_poi()` 是它失败后的 POI 关键字搜索兜底（5 千/月）。双熔断独立。详见顶 docstring | 中 |
+| `trip/seed.py` | 一次性数据初始化（会打外部 API，有 0.8s 串行节流） | 低 |
 | `trip/tools.py` | ⚠️ **旧的 function calling 工具集，当前无任何调用方**。只有 `audit_day()` 还在被 `service.audit_plan` 使用 | **小心**，别以为它在跑 |
 | `frontend/src/trip-api.js` | 接口封装。**前端所有请求都从这里出** | 低 |
-| `frontend/src/trip-store.js` | localStorage 历史 + 上次勾选偏好 | 低 |
+| `frontend/src/trip-store.js` | localStorage 历史（上限 30 条、同 plan_id 去重） | 低 |
 | `frontend/src/trip-theme.js` | 按天配色（7 色循环）、节点图标、节奏标签（地图与时间轴共用） | 低 |
 | `frontend/src/use-media.js` | 视口断点（641px，`matchMedia`）。只在「设置面板形态」与「地图按钮位置」两处需要 | 低 |
 | `frontend/src/main.js` | 路由表 + **4 层全局错误兜底**（异常渲染成可见面板而非白屏） | 中 |
 | `frontend/src/App.vue` | 站点骨架。**不要给 router-view 套 transition**，见铁律 10 | 中 |
-| `frontend/src/style.css` | 全局设计系统（32 个 CSS 变量），**桌面优先** | 中 |
+| `frontend/src/style.css` | 全局设计系统（35 个 CSS 变量），**桌面优先** | 中 |
 | `frontend/src/views/trip/*.vue` | 4 个页面，与小程序 4 个 page 一一对应 | 中 |
+| `miniprogram/` | 微信小程序端。**独立完整、与 `frontend/` 各写各的**（不共享代码），见 [`docs/MINIPROGRAM.md`](docs/MINIPROGRAM.md) | 低 |
+
+> ⚠️ **`frontend/` 与 `miniprogram/` 是两份独立实现**，`utils/` 里那几个文件是刻意重复的
+> （配色 / 接口契约 / 历史规则）。**改一边记得改另一边**，重复清单见 `docs/MINIPROGRAM.md` §2。
 
 ---
 
@@ -92,9 +104,10 @@ venv/Scripts/python ../scripts/check_planner.py    # 规则引擎回归（8 个�
 8. **所有 LLM 的结构化输出必须走 `llm.with_structured_output()` 或 `extract_json()`。**
    模型会返回带 ```` ```json ```` 围栏、尾逗号、全角引号的 JSON。自己写 `json.loads` 必崩。
 
-9. **改完必须跑回归。** `scripts/check_planner.py`（8 个用例，逐节点校验时间自洽、饭点数量与时段、
-   主题一致性、景点不凭空消失）。改提示词或 `planner.py` 后必跑。
-   注意它**需要连数据库**（要读景点数据），且目前只覆盖 `taxi`（=mixed）与 `transit`，缺 `drive` 与首末天时间窗。
+9. **改完必须跑回归。** `scripts/check_planner.py`（15 个用例，逐节点校验时间自洽、饭点数量与时段、
+   主题一致性、景点不凭空消失；覆盖 `mixed`/`transit`/`drive`、首末天时间窗、region 链式转场）。
+   改提示词或 `planner.py` 后必跑。
+   注意它**需要连数据库**（要读景点数据）。改了景点热度/景点数还要跑 `scripts/check_rank.py`（铁律 22）。
 
 10. **本机个人操作放 `local/`**（已 gitignore）：一次性脚本、含真实 Key 或本机路径的清单。
     临时验证脚本用 `.tmp-*` 前缀（同样被忽略，用完即删）。
@@ -138,21 +151,79 @@ venv/Scripts/python ../scripts/check_planner.py    # 规则引擎回归（8 个�
     （同城单调），但任何 `>= 某个小数字` 的判定都要想清楚是不是旧尺度的残留
     ——「必去」的热度线是 `MUST_HEAT=500`，定义在 planner 顶部。
 
+20. **别动 `_build_body` 里关思考的那行，也别给 LLM 调用设小 `max_tokens`。**
+    `deepseek-flash` 是混合思考模型，**思考内容同样计入 `max_tokens`**。预算被吃光时
+    返回的是**空 content**（`finish_reason=length`），而报错是「模型返回内容为空」——
+    完全指错方向。关思考必须用 `thinking: {"type": "disabled"}`，
+    `enable_thinking: False` 是 DashScope 风格、**DeepSeek 不认**（实测传了照样思考）。
+    踩过：三处 `max_tokens` 只有 1200~2000，导致阶段 ①.5 / ② / ④ **长期静默降级**——
+    它们都有 try/except 兜底，所以不报错、只是悄悄退化成规则文案。
+    **新加 LLM 调用时，`max_tokens` 别低于 8192。**
+
+21. **改完库里的景点数据，要把离线种子一起对齐。**
+    `seed_attractions.json` 是**版本化备份 + 离线兜底**，必须反映 App 的实际数据。
+    曾经漂移过一次：老城的种子停留在 T 级迁移**之前**（`heat` 是 0~100 旧尺度，
+    故宫种子 99 / 库里 990），配上 `MUST_HEAT=500` **离线灌数据一个「必去」都判不出来**。
+    漂移的机制是：`upsert_attractions` **只 upsert、不删除**，所以用 LLM 名单灌库时，
+    种子里匹配不上的旧条目会**留在原地**、从此两边各一份（「洪崖洞」vs「洪崖洞民俗风貌区」）。
+    对齐方式：**种子 = 库里现状**（逐字段：名字集合 / heat / visit_minutes / must_visit /
+    best_time / district / intro / 坐标 / tags / coord_source / 子景点）。
+    对齐后 `--source offline` 不打任何高德请求（条目都带 `coord_source=amap`）。
+    做法见 `docs/CHANGELOG.md` 的 2026-09-16 第 7 节。
+
+22. **改完景点数据 / 景点热度，首页排序分要重算。**
+    `trip_city.rank_score` 是**预存的派生值**（前 8 个高热度景点的指数加权和，第 1 名 ×1.5、第 2/3 名 ×1.2，
+    口径见 `service.RANK_*` 注释），`/cities` 按 **`rank_score`** 排序，不现算。
+    `seed` 会自动重算，但**手工改库（改 heat / 增删景点 / 调 `rank_score` 口径）不会** ——
+    漏跑不报错，只是首页顺序陈旧。所以：跑 `scripts/rank_cities.py`（或 `service.recompute_rank_scores()`），
+    再跑 `scripts/check_rank.py` —— 它会校验「存的值 == 现算的值」「接口顺序 == 按存值重排」，
+    还会打 ρ(名次, 景点数量)。⚠️ **ρ 必须用平均秩**：库里大量目的地挤在同一个景数档
+    （早先 30 个都是 8 景，`--topup` 补齐后 26 个都是 10 景），不处理并列会被排成假斜坡、
+    把 ρ 抬到 0.95（踩过一次）。
+
+23. **高德 POI 关键字搜索（place/text）额度只剩一点，能不用就不用。**
+    补坐标一律走**地理编码** `search_address()`（基础 LBS，15 万/月）——
+    增量补景点走 `--topup`（它只调 `search_address`，完全不碰 place/text）。
+    两个熔断独立（`amap.py` 的 `_QUOTA_GONE_GEO / _QUOTA_GONE_POI`），
+    POI 挂了不影响地理编码；反过来说，**别把两路额度混着算**。
+
+24. **`planner.py` 有两份实现，改一份必须同步另一份 + 跑对照脚本。**
+    `frontend/src/engine/*.js` 是 `planner.py` 的**逐函数镜像**（离线单文件版要用），
+    常量在 `engine/consts.js`，数值语义在 `engine/pyfmt.js`（Python 是「五取偶」，
+    JS 的 `Math.round`/`toFixed` 不是 —— 直接用会让文案差 1 分钟）。
+    改完任一侧**必跑** `local/offline-dump-py.py` → `local/offline-dump-js.mjs` → `local/offline-diff.py`
+    （12 个用例逐节点比对；目前 206 个节点零差异，出现不一致就是回归）。
+    ⚠️ 名字像但不是同一件事的：`engine/preview.js` 对应 `service.preview_plan` / `adjust_plan`。
+
+25. **离线版（单文件 HTML）的接口实现是 `trip-api-local.js`，不是 `trip-api.js`。**
+    视图层一律 `import ... from '@api'`，由 `frontend/vite.config.js` 的别名按构建模式切换
+    （`npm run build` → 联机版 / `npm run build:offline` → 离线版）。**别在视图里写死具体文件**，
+    也别在 `trip-api-local.js` 里悄悄改字段形状 —— 契约是 `backend/app/trip/schemas.py`。
+
 ---
 
 ## 3. 常用操作
 
 | 任务 | 命令 |
 |---|---|
-| 起前后端 | 根目录 `npm run dev`（前端 5173 + 后端 8000） |
+| 起前后端 | 根目录 `npm run dev`（前端 5176 + 后端 8002） |
 | 只起后端 | `cd backend && venv/Scripts/python run.py`（`--host` / `--port` / `--no-reload`） |
 | 灌数据 | `cd backend && venv/Scripts/python -m app.trip.seed`（`--city 成都` / `--reset` / `--no-amap` / `--only-cities`） |
+| 只灌新目的地 | `... -m app.trip.seed --only-empty --per 8` —— 新增目的地专用，**不会重灌老城** |
 | 看库里现状 | `venv/Scripts/python -m app.trip.seed --list` |
 | 规则引擎回归 | `cd backend && venv/Scripts/python ../scripts/check_planner.py` |
+| 边界检查（跨目的地重复） | `cd backend && venv/Scripts/python ../scripts/check_boundaries.py` |
+| 首页排序体检（只读） | `cd backend && venv/Scripts/python ../scripts/check_rank.py` —— 打排序分/各口径名次，校验存值与现值一致 |
+| 重算首页排序分（写库） | `cd backend && venv/Scripts/python ../scripts/rank_cities.py`（`--dry-run` 先看）—— 改过景点热度后必跑 |
+| 离线版数据（写文件） | `cd backend && venv/Scripts/python ../scripts/build_offline_data.py` —— 改过种子/排序口径后跑 |
+| 打离线单文件 HTML | `cd frontend && npm run build:offline` → `cd backend && venv/Scripts/python ../scripts/build_single_html.py` |
+| mock 单文件（无需 npm） | `cd backend && venv/Scripts/python ../scripts/build_mock_html.py` —— 手写薄壳 UI，算法/数据与正式版同源 |
+| 两份 planner 对照 | `cd backend && venv/Scripts/python ../local/offline-dump-py.py` → 根目录 `node local/offline-dump-js.mjs` → `venv/Scripts/python ../local/offline-diff.py`（期望 PASS） |
+| **增量补景点（写库）** | `cd backend && venv/Scripts/python -m app.trip.seed --topup --per 10` —— 把景点数不足 `--per` 的补到 `--per`，**已有的绝不动**；坐标**只走地理编码**（15 万/月），不打 POI 搜索（5 千/月，额度紧）；完自动回写离线种子 + 重算排序分 |
 | 前端冒烟测试 | `python scripts/smoke_ui.py`（需 playwright + 系统 Edge/Chrome；`--skip-plan` 跳过规划环节） |
-| 健康检查 | `curl -s -x "" localhost:8000/api/health` |
-| 模型别名总表 | `curl -s -x "" localhost:8000/api/health/models` |
-| 接口文档 | 浏览器开 http://localhost:8000/docs |
+| 健康检查 | `curl -s -x "" localhost:8002/api/health` |
+| 模型别名总表 | `curl -s -x "" localhost:8002/api/health/models` |
+| 接口文档 | 浏览器开 http://localhost:8002/docs |
 
 ---
 
@@ -167,6 +238,7 @@ venv/Scripts/python ../scripts/check_planner.py    # 规则引擎回归（8 个�
 | `DEEPSEEK_API_KEY` | 也可写 `MODEL_API_KEY`，两者等价 |
 | `MODEL_BASE_URL` / `MODEL_NAME` | 默认 DeepSeek 官方 / `deepseek-flash` |
 | `AMAP_KEY` | 高德 **Web 服务** Key（不是 JS API Key），仅 seed 用 |
+| _配额差异_ | ⚠️ **2026-09-17**：seed 补坐标**默认走地理编码（15 万/月）**，只有地理编码失败才回退到 POI 关键字搜索（**5 千/月**）。`backend/app/trip/amap.py` 顶 docstring 有详；`AGENTS.md` §1「目录职责」 `trip/amap.py` 行也在追这条。 |
 | `LLM_TIMEOUT` | ✅ 有效。httpx / OpenAI 客户端超时，一次完整规划约 15~30s，别设太小 |
 | `PRIVATE_LLM_*` | 私有化部署用，配了之后 `deployment="private"` 才生效 |
 
@@ -230,7 +302,7 @@ venv/Scripts/python ../scripts/check_planner.py    # 规则引擎回归（8 个�
 ```
 plan_days days=4 kept=10 dropped=2          # ① 分天完成
 gen_day day=1 ok / gen_day day=3 ✗           # ② 各天并行生成结果（✗ = 该天回退规则文案）
-materialize days=4 elapsed=17.7s            # ③ 物化耗时（≈ 整条链路总耗时）
+materialize days=4 elapsed=6.5s             # ③ 物化耗时（≈ 整条链路总耗时）
 落库前复核发现 K 处问题：...                  # audit_plan 抓到的问题（正常应为 0）
 LLM 流水线失败，降级到规则引擎：...            # 整体降级
 ```

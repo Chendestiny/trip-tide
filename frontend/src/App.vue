@@ -8,7 +8,7 @@
 </template>
 
 <script setup>
-// TripTide 根组件。
+// AI 旅行搭子 根组件。
 // 注意：这里**不要**给 <router-view> 套 <transition mode="out-in">。
 // 实测踩过坑——在 <router-view v-slot> 下配合过渡时，离场动画不完成会导致
 // 新页面永不挂载：路由已变、router-view 渲染成空注释，表现就是白屏，

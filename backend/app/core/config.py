@@ -3,7 +3,7 @@
 配置来源优先级：环境变量 > backend/.env > 本文件默认值。
 
 环境变量命名同时兼容 my-website 的既有写法（DATABASE_URL / DEEPSEEK_API_KEY），
-这样 TripTide 未来并入 my-website 时 .env 可以直接复用，不用改一行配置。
+这样 AI 旅行搭子未来并入 my-website 时 .env 可以直接复用，不用改一行配置。
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    app_name: str = "TripTide API"
+    app_name: str = "AI 旅行搭子 API"
     app_version: str = "0.1.0"
     debug: bool = True
 
@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     default_start_time: str = "09:00"
     default_return_time: str = "19:30"
     max_days: int = 7
+
+    # 首页 `/cities` 结果的进程内缓存秒数。目的地只在 seed 时变化，
+    # 设为 0 可关闭缓存（每次请求都读库）。seed 完成后会主动清缓存。
+    cities_cache_ttl: float = 300.0
 
     # ------------------------------------------------------------------
     @property

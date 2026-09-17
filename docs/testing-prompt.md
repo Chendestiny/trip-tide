@@ -41,7 +41,7 @@
 | `meal_minutes(end_hhmm)` | 当天预留的用餐分钟：能赶上晚饭返回 135，否则只 60 | 判据是 `end - (75+10) >= 17:00` |
 | `day_budget(req, day, total)` | 当天「游览+赶路」可用分钟 = 时间窗 − 当天餐时 | **绝不能乘任何倾向系数**（曾经乘了 ×1.15 导致最后一天超时） |
 | `time_rule(item)` | 时段约束。**优先读 `item.best_time` 字段**（morning/night/museum），字段为空才回退到名称关键词 | 非法 `best_time` 值应被忽略并回退 |
-| `_is_must(item)` | 「必去」= `must_visit` 为真 或 `heat >= 90` | |
+| `_is_must(item)` | 「必去」= `must_visit` 为真 或 `heat >= MUST_HEAT`（常量 = **500**，**不是**旧尺度的 90） | |
 | `haversine_m(...)` | 球面距离（米） | |
 | `travel_matrix(city, items, transport)` | 两两通行时间，键统一为 `(小 id, 大 id)` | 不能出现 `(5,2)` 这种反序键 |
 | `cluster_attractions(city, items, transport, threshold_m)` | 按**直线距离**聚类成片区簇（≤1200m 并簇） | 用最近邻成链后按距离断开 |
@@ -77,7 +77,7 @@
 
 ## 参考
 
-仓库里已有一个基线版本：`backend/tests/test_planner.py`（34 个用例，全绿）。
+仓库里已有一个基线版本：`backend/tests/test_planner.py`（**122** 个用例，全绿）。
 你可以**在它基础上补充/重写**，也可以另起一份，但覆盖度不要低于它，且应该包含更多边界值
 （空列表、单元素、边界值 90/91/180/181、极短/极长时间窗、跨零点时间窗如 `09:00 → 01:00`）。
 

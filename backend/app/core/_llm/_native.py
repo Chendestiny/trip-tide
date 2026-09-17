@@ -76,9 +76,18 @@ def _build_body(
         body["max_tokens"] = max_tokens
     if response_format is not None:
         body["response_format"] = response_format
-    # 私有化端点不一定支持 enable_thinking 扩展参数，只在线上端点注入
-    if deployment != "private":
-        body["extra_body"] = {"enable_thinking": 8192 if enable_thinking else False}
+    # 关掉思考。deepseek-flash 是**混合思考模型**，默认就会思考，而思考内容同样计入
+    # max_tokens —— 预算被吃光时返回的是**空 content**，调用方只会看到
+    # 「模型返回内容为空」这种完全指错方向的报错。
+    #
+    # ⚠️ 实测（2026-09-16）：`enable_thinking: False` 是 DashScope 风格的参数，
+    # **DeepSeek 官方端点不认**，传了照样思考（reasoning 1721 字、content 0 字）。
+    # 有效写法是 `thinking: {"type": "disabled"}`（`reasoning_effort: "none"` 亦可）。
+    #
+    # 本项目不需要思考：LLM 只负责起名 / 写建议 / 挑选项，算数全部硬编码。
+    # 私有化端点不一定支持这个扩展参数，只在线上端点注入。
+    if deployment != "private" and not enable_thinking:
+        body["extra_body"] = {"thinking": {"type": "disabled"}}
     body.update(kwargs)
     return body
 

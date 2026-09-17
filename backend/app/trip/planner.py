@@ -85,6 +85,7 @@ STANDALONE_TRAVEL_MIN = 45  # 单程 ≥45min → 独占一天
 CAPACITY_SLACK = 1.10       # 容量裁剪的松弛系数（路程有共享，但不能按 0 计）
 OVERRUN_TOLERANCE = 30      # 超过目标返回时间多少分钟算「远郊日跑长了」
 OVERNIGHT_KM = 45.0         # 当天景点离常住片区超过这个距离 → 建议就近过夜
+OVERPACK_RATIO = 1.5        # 单个景点耗时超当天预算这么多倍 → 放弃它、留成机动日（转场日常见）
 
 # ================================================================ 分天模型 v2
 # 分天的第一原则是「地理距离」，其次是景点重要性。为此先把景点量化成两件事：
@@ -265,10 +266,33 @@ def fmt_hhmm(total_minutes: int) -> str:
 
 
 def _is_standalone(city: Any, item: Any, transport: str) -> bool:
-    """是否属于「独占型」：自己就要吃掉一整天。"""
-    return item.visit_minutes >= STANDALONE_MINUTES or travel_from(
-        city, item, transport
-    ) >= STANDALONE_TRAVEL_MIN
+    """是否属于「独占型」：自己就要吃掉一整天。
+
+    ⚠️ region（环线）目的地不能拿「市中心单程」判 —— 环线横跨上千公里，
+    每个景点离中心都远，会被全部判成独占型 → 1 天只排 1 个点
+    （实测：云南单选丽江古城+玉龙雪山，1 天被排成 1 个、另一个直接消失）。
+    环线的参照点与 `_cost` 一致：**最近的过夜基地**。
+    """
+    if item.visit_minutes >= STANDALONE_MINUTES:
+        return True
+    if getattr(city, "kind", "city") == "region":
+        areas = list(getattr(city, "hotel_areas", None) or [])
+        if areas:
+            base = min(
+                areas, key=lambda h: haversine_m(h["lat"], h["lng"], item.lat, item.lng)
+            )
+            return (
+                leg(
+                    city,
+                    base["lat"],
+                    base["lng"],
+                    item.lat,
+                    item.lng,
+                    transport,
+                ).minutes
+                >= STANDALONE_TRAVEL_MIN
+            )
+    return travel_from(city, item, transport) >= STANDALONE_TRAVEL_MIN
     
 
 # ================================================================ 时段硬约束
@@ -366,7 +390,26 @@ MUST_HEAT = 500
 
 
 def _cost(city: Any, item: Any, transport: str) -> int:
-    """粗估某个景点要吃掉多少时间：游览 + 从市中心往返的路程。"""
+    """粗估某个景点要吃掉多少时间：游览 + 往返路程。
+
+    ⚠️ 往返的参照点**不能无脑用市中心**：region（环线）目的地横跨上千公里，
+    「河西走廊的中心」到莫高窟往返要 +10 小时 —— 会把走廊两端的必去景点全部误判成
+    「装不下」（实测：单选莫高窟，1 天被报「超载、会舍弃」，加到 3 天照样舍弃）。
+    环线游的合理参照是**最近的过夜基地**（hotel_areas 就是为此存在的），
+    与 plan_fallback / adjust_plan 里「当天从哪个基地出发」的口径一致。
+    """
+    if getattr(city, "kind", "city") == "region":
+        areas = list(getattr(city, "hotel_areas", None) or [])
+        if areas:
+            # hotel_areas 是 JSON 列，元素是 dict（见 pick_hotel 的取法）
+            base = min(
+                areas,
+                key=lambda h: haversine_m(h["lat"], h["lng"], item.lat, item.lng),
+            )
+            return int(
+                item.visit_minutes
+                + 2 * leg(city, base["lat"], base["lng"], item.lat, item.lng, transport).minutes
+            )
     return int(item.visit_minutes + 2 * travel_from(city, item, transport))
 
 
@@ -778,9 +821,15 @@ def trim_day(
     for item in items:
         t = leg(city, lat, lng, item.lat, item.lng, req.transport).minutes
         back = leg(city, item.lat, item.lng, olat, olng, req.transport).minutes
-        if kept and used + t + item.visit_minutes + back > per_day_budget:
-            overflow.append(item)
-            continue
+        cost = t + item.visit_minutes + back
+        if used + t + item.visit_minutes + back > per_day_budget:
+            # 已经排了东西 → 溢出。
+            # 一个都还没排时：**只有「单个景点就远超预算」才放弃**（否则保证每天不空）。
+            # 转场日常见：南疆「塔什库尔干 → 库车」628km，光路上就 500 分钟，
+            # 硬塞一个 240 分钟的大峡谷会让当天凌晨 1:25 才到酒店 —— 宁可留成机动日。
+            if kept or cost > per_day_budget * OVERPACK_RATIO:
+                overflow.append(item)
+                continue
         used += t + item.visit_minutes
         lat, lng = item.lat, item.lng
         kept.append(item)
@@ -1057,6 +1106,37 @@ def _flex_scale(
     return max(1.0, min(available * ratio / base_total, cap))
 
 
+SPOT_ADVICE_MAX = 200   # 与 TimelineNode.advice 的 max_length 对齐
+
+
+def spot_advice(item: Any) -> str:
+    """把景点的**子景点攻略**按游览顺序拼成一句 advice（**硬编码拼，不花 token**）。
+
+    子景点是 seed 阶段预存在 `trip_spot` 表里的 —— 「从哪个门进、几点人少、
+    有什么坑」这类知识 2~3 年不变，不该每次规划都让模型现写。实测 825 个景点里
+    **603 个（73%）有子景点**，所以这条路径覆盖了绝大多数。
+
+    取值优先级见 `materialize_day` 里的用法：**子景点拼串 > LLM 写的 > 库里的 intro**。
+    拼接只做截断，不做改写 —— 攻略原文是人工校对过的。
+    """
+    spots = sorted(
+        getattr(item, "spots", None) or [], key=lambda s: (s.order_index, s.id)
+    )
+    parts: list[str] = []
+    total = 0
+    for s in spots:
+        guide = str(getattr(s, "guide", "") or "").strip().rstrip("。")
+        if not guide:
+            continue
+        piece = f"{s.name}：{guide}"
+        # 留点余量：超时停在**上一个**完整点位，不要拼出半句
+        if parts and total + len(piece) + 1 > SPOT_ADVICE_MAX - 10:
+            break
+        parts.append(piece)
+        total += len(piece) + 1
+    return "；".join(parts)[:SPOT_ADVICE_MAX]
+
+
 def materialize_day(
     city: Any,
     day_index: int,
@@ -1158,7 +1238,13 @@ def materialize_day(
                 name=f"{item.name}（下午继续）" if resumed else item.name,
                 attraction_id=item.id,
                 # 优先用大纲给的建议（模型写的更具体：哪个门进、几点人少、要不要预约）
-                advice=advice.get(item.id) or item.intro or "建议留足时间慢慢逛。",
+                # 建议的取值优先级：**子景点拼串（硬编码） > LLM 写的 > 库里的 intro**
+                # 中间那层要 `.strip()`：模型偶尔返回纯空格的 advice，
+                # 直接 `or` 会因为「非空字符串」被当成有效值，advice 就白了
+                advice=spot_advice(item)
+                or (advice.get(item.id) or "").strip()
+                or item.intro
+                or "建议留足时间慢慢逛。",
                 stay_minutes=stay,
                 travel_minutes=travel,
                 travel_mode="步行" if resumed else mode,
@@ -1213,9 +1299,14 @@ def materialize_day(
 
         # 午饭要落在 11:20-14:00 之间。若这个景点会把午饭挤到 14:00 之后，就「到了先吃」；
         # 但等待超过 75 分钟就不值得等（比如 09:00 就到华山脚下），那种情况改为下来后再吃。
+        # ⚠️ 例外：「下来后再吃」如果会拖到 15:00 之后，宁可等 —— 实测西疆 Day6 出现过
+        # 10:00 到达、拒绝等 80 分钟、结果午餐 16:40（回归红线 11:00~16:00，踩过）。
         if not lunch_done:
             wait = max(0, parse_hhmm(LUNCH_FROM) - arrive)
-            if arrive + stretch(item) > parse_hhmm("14:00") and wait <= LUNCH_MAX_WAIT:
+            after = arrive + stretch(item)
+            if after > parse_hhmm("14:00") and (
+                wait <= LUNCH_MAX_WAIT or after > parse_hhmm("15:00")
+            ):
                 # 不传 gap：让它按「lunch_at - cur_time」反推，
                 # 这样「路程 80 分 + 等到 11:20 的 60 分」都算进去，时间轴依然自洽
                 add_meal("lunch", max(arrive, parse_hhmm(LUNCH_FROM)), item.district)
@@ -1466,15 +1557,20 @@ def plan_fallback(city: Any, attractions: Sequence[Any], req: PlanRequest) -> Pl
             origin=origin, depart=depart,
         )
 
-        day_plans.append(
-            build_day(
-                city, idx, kept_day, req,
-                moved_from=carried_from,
-                total_days=days,
-                hotel=hotel,
-                depart_from=prev_hotel if depart else None,
+        if not kept_day:
+            # 机动日：走 `empty_day`，**它有午餐**（`materialize_day([])` 只有晚餐，
+            # 两条路径不一致过）。`llm.run_pipeline` 也是这么处理的，保持一致。
+            day_plans.append(empty_day(city, req, idx, hotel))
+        else:
+            day_plans.append(
+                build_day(
+                    city, idx, kept_day, req,
+                    moved_from=carried_from,
+                    total_days=days,
+                    hotel=hotel,
+                    depart_from=prev_hotel if depart else None,
+                )
             )
-        )
 
         carried = []
         carried_from = {}

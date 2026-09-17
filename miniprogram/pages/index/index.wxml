@@ -1,0 +1,32 @@
+<view class="page">
+  <view class="hero">
+    <text class="title">AI 旅行搭子</text>
+    <text class="sub">小程序端骨架 · 连通性自检</text>
+  </view>
+
+  <view class="card">
+    <text class="label">后端地址（miniprogram/config.js）</text>
+    <text class="mono">{{baseUrl}}</text>
+    <text class="hint">{{statusText}}</text>
+  </view>
+
+  <view class="card">
+    <text class="label">目的地 · GET /api/trip/cities</text>
+    <view wx:if="{{loading}}" class="hint">加载中…</view>
+    <view wx:elif="{{error}}" class="err">{{error}}</view>
+    <view wx:else class="grid">
+      <view wx:for="{{cities}}" wx:key="id" class="chip">
+        <text>{{item.emoji}} {{item.name}}</text>
+        <text class="chip-sub">{{item.attraction_count}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <text class="label">待迁移</text>
+    <text class="hint">pick / plan / me 三个页面 —— 见 docs/MINIPROGRAM.md</text>
+    <text class="hint">点下方按钮重试</text>
+  </view>
+
+  <button class="retry" bindtap="check">重新检测</button>
+</view>

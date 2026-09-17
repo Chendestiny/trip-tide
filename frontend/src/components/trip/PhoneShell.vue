@@ -2,7 +2,7 @@
   <div class="shell">
     <header v-if="title || back || $slots.right" class="shell-head">
       <button v-if="back" class="back-link" aria-label="返回" @click="onBack">
-        <span class="back-arrow">←</span><span class="back-text">返回</span>
+        <svg class="back-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.6 5.4 L7.8 12 L14.6 18.6" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="back-text">返回</span>
       </button>
       <div>
         <span class="shell-title">{{ title }}</span>
@@ -44,7 +44,3 @@ defineExpose({
   scrollToTop: () => bodyEl.value?.scrollTo({ top: 0 }),
 })
 </script>
-
-<style scoped>
-.back-arrow { font-size: 19px; line-height: 1; margin-top: -2px; }
-</style>

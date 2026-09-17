@@ -2,8 +2,8 @@
 
 > 配套：[`README.md`](README.md) 索引 · [`PLAN_SCHEMA.md`](PLAN_SCHEMA.md) 时间轴字段 · [`BACKEND.md`](BACKEND.md) 后端地图
 
-Base：`/api/trip`（dev 下由 Vite 把 `/api` 代理到 `127.0.0.1:8000`）
-交互式文档：http://localhost:8000/docs
+Base：`/api/trip`（dev 下由 Vite 把 `/api` 代理到 `127.0.0.1:8002`）
+交互式文档：http://localhost:8002/docs
 
 统一约定：
 
@@ -11,11 +11,32 @@ Base：`/api/trip`（dev 下由 Vite 把 `/api` 代理到 `127.0.0.1:8000`）
 - 失败返回 FastAPI 标准错误体 `{"detail": "中文错误文案"}`，前端 `trip-api.js` 会把 `detail` 提出来直接展示。
 - 所有经纬度均为 **GCJ-02**。
 
+### 外部地图 API 边界（重要）
+
+本文件下面的 `/api/trip/*` 都是本项目自己的 FastAPI 接口，**不会把高德路径规划请求透传给前端**。
+
+| 场景 | 当前调用的高德 API | 调用时机 | 备注 |
+|---|---|---|---|
+| seed 补景点坐标 | `GET /v3/geocode/geo` | 灌数据 | 主路径，基础 LBS 配额 15 万/月 |
+| seed 坐标兜底 | `GET /v3/place/text` | 地理编码失败时 | POI 关键字搜索，配额 5 千/月；不是规划请求 |
+| 前端地图渲染 | 高德 JS API | 打开地图组件 | `VITE_AMAP_JS_KEY`，与后端 `AMAP_KEY` 不通用 |
+| 生成 `/api/trip/plan` | **无高德 API** | 每次规划 | 本地 haversine + 交通方式分档估算通行时间 |
+| 最终方案校准 | 高德驾车/步行/骑行/公交路径规划 | **尚未接入** | 计划放到用户确认行程之后，并按路段缓存 |
+
+因此，规划响应里的 `travel_minutes` 是**规则估算值**，不是高德真实导航耗时。
+
 ---
 
 ## 1. GET /api/trip/cities
 
-目的地列表，按 `heat` 降序。首页「城市 | 区域」两 tab 按 `kind` 过滤（`city` / `region`），条目含 `region`（大区）与 `attraction_count`。
+目的地列表，按 **`rank_score` 降序**（预存的首页排序分，见下）。首页「城市 | 区域」两 tab 按 `kind` 过滤（`city` / `region`），条目含 `region`（大区）与 `attraction_count`。
+
+> **排序口径**：`rank_score` = 每个目的地「前 8 个高热度景点」的指数加权和
+> —— `score = Σ heat_i × 0.9^(i-1) × B_i`（**B₁=1.5、B₂=B₃=1.2**，其余 1），
+> 并列回落 `heat`、再回落 `id`。
+> 值预存在 `trip_city.rank_score`，由 `service.recompute_rank_scores()` 维护（seed 自动跑，
+> 也可 `scripts/rank_cities.py`）；`scripts/check_rank.py` 会校验存值与现值是否一致。
+> 为什么这么算（基数问题的实测依据）见 `service.py` 的 `RANK_*` 常量注释与 `CHANGELOG.md`。
 
 **响应**
 
@@ -235,7 +256,7 @@ ratio ≥ 0.65 → 适中    否则        → 轻松
     "gen_day day=1 ok",
     "gen_day day=2 ok",
     "gen_day day=3 ok",
-    "materialize days=3 elapsed=17.7s"
+    "materialize days=3 elapsed=6.5s"
   ]
 }
 ```
@@ -259,7 +280,8 @@ ratio ≥ 0.65 → 适中    否则        → 轻松
 > 流水线失败**不会**返回 5xx —— 会自动降级到规则引擎并返回 200（`source=fallback`，summary 末尾注明原因）。
 > 只有「降级也失败」（例如数据库写不进去）才会报 500。
 >
-> 耗时参考：4 天 10 个景点实测 **17.7 秒**（4 路并行）。旧的 function calling 工具编排方案要 1.1 分钟。
+> 耗时参考：4 天 10 个景点实测 **17.7 秒**（4 路并行）；**2026-09-16 关掉模型思考后为 6~7 秒**。
+> 旧的 function calling 工具编排方案要 1.1 分钟。
 
 ---
 
@@ -374,7 +396,7 @@ planner.pick_attractions()   必去优先 → 热度其次，累计游览时长�
 ```json
 {
   "ok": true,
-  "app": "TripTide API",
+  "app": "AI 旅行搭子 API",
   "version": "0.1.0",
   "llm_ready": true,
   "amap_ready": true,
