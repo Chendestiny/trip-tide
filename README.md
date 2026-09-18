@@ -1,5 +1,7 @@
 # AI 旅行搭子 — AI 行程规划
 
+**中文** ｜ [English](README.en.md)
+
 国内旅游自助规划工具：**选城市 → 勾景点 → AI 出按天方案**（地理顺路排序、时间轴、餐饮区域、住宿片区与取舍理由）。
 
 V1 交付形态是 **响应式网页版**（Vue 3 + Vite，桌面优先，宽度 ≤640px 才切手机 App 形态）。
@@ -23,13 +25,13 @@ V1 交付形态是 **响应式网页版**（Vue 3 + Vite，桌面优先，宽度
 
 ## 界面
 
-| 宽屏 · 首页 | 宽屏 · 景点池 |
+| 宽屏 · 首页：城市 / 区域 两个 tab | 宽屏 · 景点池：左设置面板 + 实时紧凑度预估 |
 |---|---|
-| ![首页](docs/screenshots/wide-1-home.png) | ![景点池](docs/screenshots/wide-2-pick.png) |
+| ![首页](docs/screenshots/wide-home.png) | ![景点池](docs/screenshots/wide-pick.png) |
 
-| 宽屏 · 行程结果 | 手机 · 景点池 |
+| 宽屏 · 行程结果：时间轴 + 地图 + 说明卡 | 手机 · 行程结果（同一 DOM，媒体查询切换） |
 |---|---|
-| ![结果页](docs/screenshots/wide-3-plan.png) | ![手机](docs/screenshots/mobile-2-pick.png) |
+| ![结果页](docs/screenshots/wide-plan.png) | ![手机](docs/screenshots/mobile-plan.png) |
 
 视觉是一套自建的设计系统（`style.css` 顶部的 35 个 CSS 变量）：偏暖的中性底色、多层叠加阴影、
 8 色循环的城市图标、按天配色的时间轴（7 色循环）。没有引 UI 框架——这个界面只有 4 页，自绘比配 Element Plus 更轻也更可控。
@@ -81,13 +83,13 @@ cp .env.example .env      # 填 DATABASE_URL / DEEPSEEK_API_KEY / AMAP_KEY
 
 ```bash
 cd backend
-venv\Scripts\python -m app.trip.seed              # 全部 18 个目的地（很慢，见下）
+venv\Scripts\python -m app.trip.seed              # 全部 68 个目的地（很慢，见下）
 venv\Scripts\python -m app.trip.seed --city 成都   # 只灌一个城市（推荐）
 venv\Scripts\python -m app.trip.seed --list       # 看库里现状
 ```
 
 有 Key 时走「LLM 出名单 → 高德**地理编码**补真实坐标（POI 搜索只作兜底）」；无 Key 时用离线种子
-（`data/seed_attractions.json`，**18 个目的地都与库逐字段一致**）。种子里的条目都带
+（`data/seed_attractions.json`，**68 个目的地都与库逐字段一致**）。种子里的条目都带
 `coord_source=amap` 与子景点坐标，所以 `--source offline` **不打任何高德请求**。
 
 > 📌 **种子必须与库保持同步**：曾经漂移过一次（老城的 `heat` 停留在 T 级迁移之前的 0~100 旧尺度，
@@ -205,32 +207,6 @@ python scripts/smoke_ui.py --skip-plan
 
 ---
 
-## 已知取舍（V1）
-
-- **无账号体系**：历史只存 localStorage（上限 30 份），换设备就没了。后端 `GET /plans` 已就绪，接入登录即可切换。
-- **通行时间用分档经验系数**，不是真实路径规划：精度约 ±10 分钟，规划阶段够用。要更准需接高德路径规划 API 并按天缓存。
-- **时段硬知识是关键词表**：看动物→上午、夜景→15:00 后、博物馆→15:30 前，共 3 类。
-  要覆盖更多需给景点加 `best_time` 字段、seed 时由 LLM 标注。
-- **景点上限 40 个**：一次勾太多会超上下文，路由层直接拦掉。
-- **并发是单进程**：一天一路并行（`MAX_WORKERS=4`）。要支撑多人需改异步队列 + 轮询/SSE。
-- **餐饮来源是 LLM 给的片区 + 特色小吃**，不是数据库里的真实店铺（见上方设计要点）。
-
----
-
-## 未来并入 my-website
-
-本项目按「可嵌入」设计，并库时要做的事很少：
-
-1. `backend/app/trip/` 与 `backend/app/core/` 整目录拷过去；
-2. `main.py` 里 `app.include_router(trip_router, prefix="/api/trip")` 一行；
-3. `frontend/src/views/trip/`、`components/trip/`、`trip-*.js` 拷过去，
-   在站点 `main.js` 注册 4 条 `/trip*` 路由；
-4. 配置项名字已经对齐（`DATABASE_URL` / `DEEPSEEK_API_KEY`），`.env` 直接复用。
-
-唯一要改的是 `PhoneShell.vue` —— 嵌进站点时换成站点的页面外壳（去掉应用壳与底部标签栏）。
-
----
-
 ## 文档
 
 | 文档 | 讲什么 |
@@ -240,8 +216,10 @@ python scripts/smoke_ui.py --skip-plan
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 分层与设计取舍：为什么这么切、交通模型、紧凑度、踩过的坑 |
 | [`docs/BACKEND.md`](docs/BACKEND.md) | 后端符号级地图：每个文件导出什么、四张表结构 |
 | [`docs/FRONTEND.md`](docs/FRONTEND.md) | 前端符号级地图：路由、组件、状态、设计系统变量表、响应式 |
+| [`docs/OFFLINE.md`](docs/OFFLINE.md) | **离线单文件版**：两份 planner 的镜像关系、构建开关（`@api`）、一致性验证 |
+| [`docs/MINIPROGRAM.md`](docs/MINIPROGRAM.md) | **微信小程序端**：为什么另起目录、与 Web 的重复清单、本地开发三档、页面映射 |
 | [`docs/API.md`](docs/API.md) | 9 个 HTTP 接口的契约、错误码、紧凑度阈值推导 |
 | [`docs/PLAN_SCHEMA.md`](docs/PLAN_SCHEMA.md) | 时间轴数据结构 `PlanResult` 全字段说明 |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | 环境搭建、常用命令、测试、排查表、待办 |
-| [`docs/testing-prompt.md`](docs/testing-prompt.md) | 交给其他模型写单元测试用的提示词（自包含） |
-| [`AGENTS.md`](AGENTS.md) | 给 AI agent 的操作手册与 21 条铁律 |
+| [`docs/testing-prompt.md`](docs/testing-prompt.md) | 交给其他模型写单元测试用的提示词（自包含；Python 侧基线 `backend/tests/test_planner.py` 122 用例，JS 侧 `frontend/tests/` 39 用例） |
+| [`AGENTS.md`](AGENTS.md) | 给 AI agent 的操作手册与 25 条铁律 |

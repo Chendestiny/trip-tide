@@ -187,13 +187,17 @@ venv/Scripts/python ../scripts/check_rank.py       # 首页排序体检（只读
     两个熔断独立（`amap.py` 的 `_QUOTA_GONE_GEO / _QUOTA_GONE_POI`），
     POI 挂了不影响地理编码；反过来说，**别把两路额度混着算**。
 
-24. **`planner.py` 有两份实现，改一份必须同步另一份 + 跑对照脚本。**
+24. **`planner.py` 有两份实现，改一份必须同步另一份 + 跑测试与对照脚本。**
     `frontend/src/engine/*.js` 是 `planner.py` 的**逐函数镜像**（离线单文件版要用），
     常量在 `engine/consts.js`，数值语义在 `engine/pyfmt.js`（Python 是「五取偶」，
     JS 的 `Math.round`/`toFixed` 不是 —— 直接用会让文案差 1 分钟）。
-    改完任一侧**必跑** `local/offline-dump-py.py` → `local/offline-dump-js.mjs` → `local/offline-diff.py`
-    （12 个用例逐节点比对；目前 206 个节点零差异，出现不一致就是回归）。
+    改完任一侧**必跑**（全绿才算完）：
+    ① `cd frontend && npm test`（引擎单元测试 **39** 用例，含 region 回归）；
+    ② `local/offline-dump-py.py` → `local/offline-dump-js.mjs` → `local/offline-diff.py`
+    （12 个用例逐节点比对，目前 **195** 个节点零差异，出现不一致就是回归）。
     ⚠️ 名字像但不是同一件事的：`engine/preview.js` 对应 `service.preview_plan` / `adjust_plan`。
+    ⚠️ 两份实现的**裁剪口径必须逐参数对齐**（连 `trim_day` 的 `origin` 都不能差）——
+    实测 preview 没传住宿原点，region 的莫高窟被预览判「超载舍弃」而生成排得下（2026-09-17）。
 
 25. **离线版（单文件 HTML）的接口实现是 `trip-api-local.js`，不是 `trip-api.js`。**
     视图层一律 `import ... from '@api'`，由 `frontend/vite.config.js` 的别名按构建模式切换
@@ -212,6 +216,7 @@ venv/Scripts/python ../scripts/check_rank.py       # 首页排序体检（只读
 | 只灌新目的地 | `... -m app.trip.seed --only-empty --per 8` —— 新增目的地专用，**不会重灌老城** |
 | 看库里现状 | `venv/Scripts/python -m app.trip.seed --list` |
 | 规则引擎回归 | `cd backend && venv/Scripts/python ../scripts/check_planner.py` |
+| **引擎单元测试（JS）** | `cd frontend && npm test` —— 39 用例（node --test 零依赖）；region 回归单独跑：`node ../local/check-preview-region.mjs` |
 | 边界检查（跨目的地重复） | `cd backend && venv/Scripts/python ../scripts/check_boundaries.py` |
 | 首页排序体检（只读） | `cd backend && venv/Scripts/python ../scripts/check_rank.py` —— 打排序分/各口径名次，校验存值与现值一致 |
 | 重算首页排序分（写库） | `cd backend && venv/Scripts/python ../scripts/rank_cities.py`（`--dry-run` 先看）—— 改过景点热度后必跑 |

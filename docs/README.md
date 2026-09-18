@@ -31,9 +31,18 @@
 
 ---
 
-## 当前状态（2026-09-16 · 新会话从这里接）
+## 当前状态（2026-09-18 · 新会话从这里接）
 
-**最近一轮**：目的地扩容 + 修掉 LLM 调用层的一个隐藏 bug。
+**最近一轮（2026-09-17 傍晚～晚间）**：离线单文件版（参赛形态）+ region 排程误判修复 + 引擎单元测试。
+
+- **离线单文件版落地**（详见 [`OFFLINE.md`](OFFLINE.md)）：`frontend/src/engine/` 是 `planner.py` 的逐函数 JS 镜像，
+  排程在浏览器里算、数据内联（68 目的地 / 899 景点 / 1724 子景点）；`npm run build:offline` 出 Vue 正式版单文件，
+  `scripts/build_mock_html.py` 出**无需 npm 的 mock 单文件**（`dist/trip-buddy-mock.html`，含宽屏双栏 + 手机两套布局）。
+  两份 planner 的同步靠三重回归守着：`npm test`（**39 用例**）+ `local/offline-diff.py`（12 用例逐节点对照）+ `check_planner.py`。
+- **修掉 region（环线）排程误判（用户实测：河西走廊+莫高窟报超载）**：
+  路程参照点从「目的地中心」改为「最近过夜基地」（`_cost` / `_is_standalone`）；
+  `preview_plan` 的裁剪传当天住宿片区做 origin，与生成同口径；午餐启发式改「**拆分优先于先吃**」。
+  详见 `CHANGELOG.md` 2026-09-17（傍晚）§7/§8。
 
 - **修掉两个用户报的 BUG（2026-09-17 下午）**：
   ① `GET /cities` 原来是 **70 条 SQL / 3.4 秒**（`len(c.attractions)` 的 68 连击 × 远端 MySQL 38.6ms RTT），

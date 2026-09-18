@@ -126,6 +126,7 @@ npm run seed       # 等价于 backend 里的初始化
 | 只灌新目的地 | `... -m app.trip.seed --only-empty --per 8` —— **只处理库里还没有景点的目的地**，不会碰老城 |
 | 看库里现状 | `venv/Scripts/python -m app.trip.seed --list` |
 | 后端规则引擎回归 | `cd backend && venv/Scripts/python ../scripts/check_planner.py` |
+| **前端引擎单元测试** | `cd frontend && npm test` —— **39 用例**（node --test，零依赖），测 `src/engine/` 排程引擎镜像；region 预估回归单独跑 `node ../local/check-preview-region.mjs`。改了 `planner.py` 或 `engine/*.js` **两边都要跑**，详见 [`OFFLINE.md`](OFFLINE.md) |
 | 跨目的地边界检查 | `cd backend && venv/Scripts/python ../scripts/check_boundaries.py`（`-v` 看完整清单）—— **加了目的地之后必跑** |
 | 首页排序体检 | `cd backend && venv/Scripts/python ../scripts/check_rank.py`（`--drill` 补口径对照）—— **只读**，查「首页为什么是这个顺序」+ 排序分是否过期 |
 | 重算首页排序分 | `cd backend && venv/Scripts/python ../scripts/rank_cities.py`（`--dry-run` 先看）—— **改过景点热度后必跑**；seed 会自动跑 |
@@ -196,7 +197,7 @@ cd backend && venv/Scripts/python ../scripts/check_planner.py
 | 7 | 北京 | 前 12 | 4 | `transit` | 含八达岭/十三陵远郊 |
 | 8 | 北京 | 前 6 | 2 | `taxi` | — |
 
-> ⚠️ **这个脚本需要连数据库**（要读景点数据），所以严格说不是纯离线。另外它的 `transport` 还在用历史值 `taxi`（会被 `PlanRequest` 归一为 `mixed`），**没有覆盖 `drive` / `transit` 新档位**——建议补用例。
+> ⚠️ **这个脚本需要连数据库**（要读景点数据），所以严格说不是纯离线。~~没有覆盖 `drive` / `transit`~~ —— 2026-09-17 已补：现在 15 个用例，覆盖 `mixed`（历史值 `taxi`）/ `transit` / **`drive`** 与首末天时间窗、region 链式转场（贵州/川西/南疆）。
 
 ### 前端：`scripts/smoke_ui.py`
 
@@ -216,6 +217,21 @@ python scripts/smoke_ui.py --skip-plan  # 跳过耗时约 20s 的规划环节
 - `BASE = http://localhost:5176`，默认城市成都
 
 > 本机环境提示：`agent-browser` 类工具在 Windows 上不可用，`smoke_ui.py` 借系统 Edge（`channel="msedge"`）是本机唯一可行的浏览器自动化路径。
+
+### 离线引擎：`frontend/tests/`（node --test）
+
+**测的是 `src/engine/`（planner.py 的 JS 镜像）**，纯函数、零依赖、不需要起服务：
+
+```bash
+cd frontend && npm test                 # 39 用例（basics / planner / preview 三份）
+node ../local/check-preview-region.mjs  # region 预估回归（河西走廊+莫高窟 / 云南）
+```
+
+覆盖：pyfmt 的 Python 舍入语义、leg 各档交通选择、grade/MUST_HEAT 边界、
+region 按「最近过夜基地」判独占与路程（**莫高窟误判超载的回归**，2026-09-17）、
+聚类同簇、裁剪保护必去、materialize 时间自洽与饭点窗口、plan_fallback 无凭空消失、
+预估与生成口径一致。改了 `planner.py` 或 `engine/*.js` **两边都要跑**，
+并与 `local/offline-diff.py`（两侧逐节点对照）一起构成三重回归，详见 [`OFFLINE.md`](OFFLINE.md)。
 
 ---
 

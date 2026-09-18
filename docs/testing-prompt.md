@@ -78,6 +78,8 @@
 ## 参考
 
 仓库里已有一个基线版本：`backend/tests/test_planner.py`（**122** 个用例，全绿）。
+**JS 侧镜像引擎也有基线**：`frontend/tests/`（**39** 个用例，`npm test` 用 node --test 跑，零依赖）——
+改 `planner.py` 或 `frontend/src/engine/*.js` 后两边都要跑，另见 [`OFFLINE.md`](OFFLINE.md)。
 你可以**在它基础上补充/重写**，也可以另起一份，但覆盖度不要低于它，且应该包含更多边界值
 （空列表、单元素、边界值 90/91/180/181、极短/极长时间窗、跨零点时间窗如 `09:00 → 01:00`）。
 

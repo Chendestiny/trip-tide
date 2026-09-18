@@ -336,18 +336,18 @@ LLM 返回不可靠，四步兜底：剥 ```` ```json ```` 围栏 → `find("{")
 | `list_attractions(db, key)` | 191 | `order_by(heat.desc(), visit_minutes.desc())`；顺带一条 `group by` 取子景点数、算 `distance_km`（前端 30/45km 分档标「周边 / 远郊」） |
 | `list_spots(db, attraction_id)` | 220 | 某景点的子景点。**单独接口**，避免景点列表响应变肥 |
 | `_all_of_city` / `_load_selected` | 232 / 243 | 一键 AI 的候选池 / 按 id 取景点并校验属于该城 |
-| **`preview_plan(db, req)`** | 257–385 | 紧凑度预估（见下） |
-| `audit_plan(plan, req)` | 386 | 逐天 `tools.audit_day` + **跨天**重复检测，**只打 warning 日志**，不阻断。⚠️ **同一天内出现两次不算重复**（景点跨午饭会被有意拆成「上午段 + 下午继续」） |
-| `_store(...)` | 412 | 落库，返回 `TripPlan`（其 `.id` 即 `plan_id`） |
-| **`generate_plan(db, req)`** | 435–477 | 主链路（见下） |
-| **`generate_auto_plan(db, payload)`** | 480 | 一键 AI：`planner.pick_attractions` 自动挑景点 → 转成 `PlanRequest` → **复用 `generate_plan`**，所以产物结构与降级行为完全一致 |
-| **`adjust_plan(db, plan_id, patch)`** | 514–650 | 倾向微调（见下） |
-| `_unwrap(raw)` | 651 | 兼容 `{"plan","review","trace"}` 包装与老裸 `PlanResult` |
-| `_to_response(...)` | 658 | 组装 `PlanResponse`；`created_at` 格式 `%Y-%m-%d %H:%M:%S` |
-| **`get_plan(db, plan_id)`** | 681 | `db.get(TripPlan, plan_id)`，缺失 404；从 `request_json["attraction_ids"]` 反查景点 |
-| `list_plans(db, limit=20)` | 693 | `order_by(id.desc())`，limit 夹在 1–100 |
+| **`preview_plan(db, req)`** | 257–391 | 紧凑度预估（见下） |
+| `audit_plan(plan, req)` | 400 | 逐天 `tools.audit_day` + **跨天**重复检测，**只打 warning 日志**，不阻断。⚠️ **同一天内出现两次不算重复**（景点跨午饭会被有意拆成「上午段 + 下午继续」） |
+| `_store(...)` | 426 | 落库，返回 `TripPlan`（其 `.id` 即 `plan_id`） |
+| **`generate_plan(db, req)`** | 449–491 | 主链路（见下） |
+| **`generate_auto_plan(db, payload)`** | 494 | 一键 AI：`planner.pick_attractions` 自动挑景点 → 转成 `PlanRequest` → **复用 `generate_plan`**，所以产物结构与降级行为完全一致 |
+| **`adjust_plan(db, plan_id, patch)`** | 528–662 | 倾向微调（见下） |
+| `_unwrap(raw)` | 665 | 兼容 `{"plan","review","trace"}` 包装与老裸 `PlanResult` |
+| `_to_response(...)` | 672 | 组装 `PlanResponse`；`created_at` 格式 `%Y-%m-%d %H:%M:%S` |
+| **`get_plan(db, plan_id)`** | 695 | `db.get(TripPlan, plan_id)`，缺失 404；从 `request_json["attraction_ids"]` 反查景点 |
+| `list_plans(db, limit=20)` | 707 | `order_by(id.desc())`，limit 夹在 1–100 |
 
-#### `generate_plan`（351–393）
+#### `generate_plan`（449–491）
 
 ```python
 resolve_city → _load_selected
@@ -392,8 +392,16 @@ ratio      = avg_visit / max(1, target)                                         
 
 `travel_total` 含**每天末站返回住宿片区的那一段**（`_group_load` 内部含返程）。
 
+> ⚠️ **逐天裁剪必须传 `origin`（当天住宿片区）**（2026-09-17 修复）：
+> 早期 `preview_plan` 的 `trim_day` 不传 origin、退回「市中心往返」——
+> 对 region（环线）目的地，中心到景点动辄几百公里，
+> 莫高窟被误判「装不下、超载」而真实生成（`plan_fallback` 按当天基地算）排得下。
+> 现已改为 `plan_hotels(...)` → `_hotel_origin(...)` → `trim_day(..., origin=...)`，与生成同口径。
+
 `will_drop` 来自两处：① `prune_to_capacity` 按**「(热度 + 必去加成) ÷ 耗时」由低到高**丢的；② 各天 `trim_day` 溢出的（原因写「当天时间装不下」）。
-`suggestion`（258 起）按档位给建议，超载时提示加到 `min(7, days+1)` 天。
+`suggestion`（258 起）按档位给建议，超载时提示加到 `min(7, days+1)` 天；
+**有舍弃但日均未超标（ratio < 1）** 时单独一个分支：说明原因是「路程太远或单点耗时太长」，
+不再喊「远超目标」（日均 240 却喊远超 450 的自相矛盾文案，实测踩过）。
 
 > ⚠️ **`capacity_minutes` 与 `load_ratio` 仍在响应里，但只作参考、不参与判定**。
 > 它们对天数不敏感 —— `load` 的分子分母同随天数增长，加天数几乎不动，算不出「6 天只排了 4 天的量」。
@@ -500,15 +508,13 @@ Leg.minutes = int(round(minutes / 5) * 5)       # 对齐到 5 分钟
 
 #### 分天五步
 
-| 步骤 | 函数 | 行号 | 算法 |
-|---|---|---|---|
-| ① 容量裁剪 | `prune_to_capacity` | 402 | `capacity = per_day_budget × days × 1.10`；循环丢 `min(_value)` 者（`_value = (heat + 30 if must_visit) / (visit + 2×travel)`）；**条件是 `len(kept) > 1`，永远不裁到 0** |
-| ② 独占隔离 | `assign_days` 内部 | — | `_is_standalone`（≥4h 或单程 ≥45min）各占一天；独占数超天数时多余的回归普通池 |
-| ③ **片区簇分配** | `cluster_attractions`(501) → `_split_cluster`(535) / `_group_load`(568) / `_alloc_clusters_to_days`(587)，由 `assign_days`(637) 编排 | 637 | **按直线距离 ≤1200m 聚类（`CLUSTER_MAX_METERS`），簇是分天的原子、不可拆**——这是「锦里古街↔武侯祠（0.24km）必然同日」的保证。簇太多就合并最近的两簇，太少只在「真断点」处拆。分配成本用 `_group_load` = 游览 + 路程（远郊景点游览 1h、往返却要 3h，只看游览时长会低估） |
-| ④ 逐天裁剪 | `trim_day` | 756 | 按当天真实预算（含末站回住宿片区的返程）再裁；溢出顺延次日。⚠️ 「第一个景点无条件保留」**有个例外**：单个景点耗时 > `预算 × OVERPACK_RATIO`（1.5）时也放弃 —— 否则 628km 的转场日会排到凌晨 1:25（见 `CHANGELOG.md` 2026-09-17 第 2 节） |
-| ⑤ 时段排序 | `apply_time_rules`(333)，`assign_days` 末行调用 | 333 | 早场提前、夜景推后（稳定排序） |
+| ① 容量裁剪 | `prune_to_capacity` | 445 | `capacity = per_day_budget × days × 1.10`；循环丢 `min(_value)` 者（`_value = (heat + 30 if must_visit) / (visit + 2×travel)`）；**条件是 `len(kept) > 1`，永远不裁到 0**。⚠️ `_cost` 的往返参照点：city 用**市中心**，**region 用最近的过夜基地**（环线横跨上千公里，按中心算会把走廊两端的必去景点全部误判装不下，2026-09-17 修复） |
+| ② 独占隔离 | `assign_days` 内部 | — | `_is_standalone`（≥4h 或单程 ≥45min）各占一天；独占数超天数时多余的回归普通池。⚠️ 单程参照点同上：**region 按最近过夜基地**（按中心算会让 region 所有景点都成独占型 → 1 天只排 1 个点） |
+| ③ **片区簇分配** | `cluster_attractions`(544) → `_split_cluster`(578) / `_group_load`(611) / `_alloc_clusters_to_days`(630)，由 `assign_days`(680) 编排 | 680 | **按直线距离 ≤1200m 聚类（`CLUSTER_MAX_METERS`），簇是分天的原子、不可拆**——这是「锦里古街↔武侯祠（0.24km）必然同日」的保证。簇太多就合并最近的两簇，太少只在「真断点」处拆。分配成本用 `_group_load` = 游览 + 路程（远郊景点游览 1h、往返却要 3h，只看游览时长会低估） |
+| ④ 逐天裁剪 | `trim_day` | 798 | 按当天真实预算（含末站回住宿片区的返程）再裁；溢出顺延次日。⚠️ 「第一个景点无条件保留」**有个例外**：单个景点耗时 > `预算 × OVERPACK_RATIO`（1.5）时也放弃 —— 否则 628km 的转场日会排到凌晨 1:25（见 `CHANGELOG.md` 2026-09-17 第 2 节） |
+| ⑤ 时段排序 | `apply_time_rules`(357)，`assign_days` 末行调用 | 357 | 早场提前、夜景推后（稳定排序） |
 
-编排入口 `plan_fallback`(1478)：`per_day_budget = min(day_budget)` → `prune_to_capacity` → `assign_days` → `plan_hotels`(841) → 逐天 `trim_day` + `build_day`(1376)，溢出顺延，最后一天溢出进 `dropped`。
+编排入口 `plan_fallback`(1535)：`prune_to_capacity` → `assign_days` → `plan_hotels`(890) → 逐天 `trim_day` + `materialize_day`(1140)，溢出顺延，最后一天溢出进 `dropped`。
 
 > ⚠️ **别用通行时间做聚类阈值**：速度模型有「1.5km 内一律步行」+「耗时取整到 5 分钟」两个噪音，
 > 会让阈值在 8~15 分钟之间出现悬崖。见 [`../AGENTS.md`](../AGENTS.md) 铁律 16。
@@ -547,13 +553,14 @@ def push(node):
 
 | 逻辑 | 行号 | 条件 |
 |---|---|---|
-| 先吃午饭 | 1214–1228 | `arrive + visit > 14:00` 且 `11:20 - arrive ≤ 75` → 先吃，之后进景区 `travel` 重置为 **5 分钟**（只需步行进景区，不重算城际路程） |
-| 出来立刻吃 | 1256–1257 | `cur_time >= 11:40` |
-| 午饭兜底 | 1263 | `max(cur_time, "12:00")` |
-| 晚餐锚点 | 1295–1332 | 先算回住宿片区的 `back_leg`，`dinner_at = max(arrive_back, "18:00")` |
-| 留白节点 | 1318–1327 | 若 `dinner_at - arrive_back > 90` → 插 `type="transit"` 的「返回住宿片区休整 · 自由活动」，避免时间轴凭空缺几小时 |
-| 超时提示 | 1337 | `overrun > 30` 时在 advice 追加说明 |
-| 丰富度 | 1357 | `active = Σstay + Σtravel`；`≤300 → 轻松`，`≤450 → 适中`，否则 `紧凑` |
+| **跨午饭拆分（优先）** | 1259–1280 | `arrive < 11:20 < arrive+stretch` 且前后两段都 ≥30min → 拆「上午段 + 午餐 + 下午段（同 id，名带「下午继续」）」。⚠️ **必须先于「先吃」判定** —— 拆分能保住完整游览，顺序反了会先触发先吃、拆分被跳过（实测西疆 Day6 午餐 16:40，2026-09-17 修复） |
+| 先吃午饭 | 1283–1300 | 仅当**不能拆分**：`arrive + stay > 14:00` 且（`11:20 - arrive ≤ 75` **或 `arrive + stay > 15:00`**——宁可等也不把午餐拖过 15 点）→ 先吃，之后进景区 `travel` 重置为 **5 分钟**；若先吃的时刻 ≥15:00（长途转场日，如南疆 Day6 库车→喀什 460min）→ **不单列午餐**，那顿并进晚餐（回归口径：午餐可为 0，首景须晚于 15:00 到达） |
+| 出来立刻吃 | 1352–1354 | `cur_time >= 11:40` |
+| 午饭兜底 | 1359 | `max(cur_time, "12:00")` |
+| 晚餐锚点 | 1370s | 先算回住宿片区的 `back_leg`，`dinner_at = max(arrive_back, "18:00")` |
+| 留白节点 | — | 若 `dinner_at - arrive_back > 90` → 插 `type="transit"` 的「返回住宿片区休整 · 自由活动」，避免时间轴凭空缺几小时 |
+| 超时提示 | — | `overrun > 30` 时在 advice 追加说明 |
+| 丰富度 | 末尾 | `active = Σstay + Σtravel`（**排除 transit 留白节点**）；`≤300 → 轻松`，`≤450 → 适中`，否则 `紧凑` |
 
 插餐饮时传 `gap`（从上一站到餐厅的耗时）；不传则按「目标时刻 − cur_time」反推。**所以即使为凑饭点等了 60 分钟，时间轴依然自洽。**
 
