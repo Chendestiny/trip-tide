@@ -64,10 +64,13 @@ export default defineConfig(({ mode }) => {
 
     server: {
       port: 5176,
-      // 开发时把 /api 请求代理到后端（AI 旅行搭子 独占 8002，避开 my-website 的 8000）
+      // 开发时把 /api 请求代理到后端（本项目的后端固定跑在 8002）。
+      // ⚠️ 别在这里加 proxy error 重试：Vite 自己的 error 监听器注册在 `configure` 之后，
+      //    同一个 tick 里就会把 500 写掉（见 vite/dist/node/chunks 里 proxyMiddleware），
+      //    代理层抢不过它。后端冷启动的重试在 `src/trip-api.js`。
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:8002',
+          target: process.env.VITE_API_TARGET || 'http://127.0.0.1:8002',
           changeOrigin: true,
         },
       },

@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:offline": "vite build --mode offline",
-    "test": "node --test tests/engine-basics.test.js tests/engine-planner.test.js tests/engine-preview.test.js",
+    "test": "node --test tests/engine-basics.test.js tests/engine-planner.test.js tests/engine-preview.test.js tests/engine-invariants.test.js tests/api-boot-retry.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
