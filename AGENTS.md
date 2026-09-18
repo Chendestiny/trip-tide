@@ -192,9 +192,9 @@ venv/Scripts/python ../scripts/check_rank.py       # 首页排序体检（只读
     常量在 `engine/consts.js`，数值语义在 `engine/pyfmt.js`（Python 是「五取偶」，
     JS 的 `Math.round`/`toFixed` 不是 —— 直接用会让文案差 1 分钟）。
     改完任一侧**必跑**（全绿才算完）：
-    ① `cd frontend && npm test`（引擎单元测试 **39** 用例，含 region 回归）；
+    ① `cd frontend && npm test`（前端单元测试 **84** 用例：引擎镜像 + 接口层，含 region 回归）；
     ② `local/offline-dump-py.py` → `local/offline-dump-js.mjs` → `local/offline-diff.py`
-    （12 个用例逐节点比对，目前 **195** 个节点零差异，出现不一致就是回归）。
+    （12 个用例逐节点比对，目前 **207** 个节点零差异，出现不一致就是回归）。
     ⚠️ 名字像但不是同一件事的：`engine/preview.js` 对应 `service.preview_plan` / `adjust_plan`。
     ⚠️ 两份实现的**裁剪口径必须逐参数对齐**（连 `trim_day` 的 `origin` 都不能差）——
     实测 preview 没传住宿原点，region 的莫高窟被预览判「超载舍弃」而生成排得下（2026-09-17）。
@@ -216,7 +216,7 @@ venv/Scripts/python ../scripts/check_rank.py       # 首页排序体检（只读
 | 只灌新目的地 | `... -m app.trip.seed --only-empty --per 8` —— 新增目的地专用，**不会重灌老城** |
 | 看库里现状 | `venv/Scripts/python -m app.trip.seed --list` |
 | 规则引擎回归 | `cd backend && venv/Scripts/python ../scripts/check_planner.py` |
-| **引擎单元测试（JS）** | `cd frontend && npm test` —— 39 用例（node --test 零依赖）；region 回归单独跑：`node ../local/check-preview-region.mjs` |
+| **前端单元测试（JS）** | `cd frontend && npm test` —— 84 用例（node --test 零依赖；引擎镜像 + 接口层）；region 回归单独跑：`node ../local/check-preview-region.mjs` |
 | 边界检查（跨目的地重复） | `cd backend && venv/Scripts/python ../scripts/check_boundaries.py` |
 | 首页排序体检（只读） | `cd backend && venv/Scripts/python ../scripts/check_rank.py` —— 打排序分/各口径名次，校验存值与现值一致 |
 | 重算首页排序分（写库） | `cd backend && venv/Scripts/python ../scripts/rank_cities.py`（`--dry-run` 先看）—— 改过景点热度后必跑 |
@@ -234,8 +234,8 @@ venv/Scripts/python ../scripts/check_rank.py       # 首页排序体检（只读
 
 ## 4. 改配置
 
-全部配置项在 `backend/app/core/config.py`，`.env` 里写。变量名与 my-website 对齐
-（`DATABASE_URL` / `DEEPSEEK_API_KEY`），未来并库可直接复用。
+全部配置项在 `backend/app/core/config.py`，`.env` 里写。变量名用通用命名
+（`DATABASE_URL` / `DEEPSEEK_API_KEY`），与其它项目并库时可直接复用。
 
 | 变量 | 说明 |
 |---|---|

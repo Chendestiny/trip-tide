@@ -8,7 +8,7 @@
 
 <script setup>
 // 底部标签栏（App 尺寸下比侧边导航更合适）。
-// 并入 my-website 时可整体替换成站点的 SiteNav，本组件不承载业务逻辑。
+// 嵌进宿主站点时可整体替换成站点的 SiteNav，本组件不承载业务逻辑。
 defineProps({
   active: { type: String, default: 'home' },
 })

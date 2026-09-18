@@ -532,7 +532,15 @@ def audit_day(dp: DayPlan, req: PlanRequest) -> list[str]:
     lunch = [n for n in meals if n.time < "15:00"]
     dinner = [n for n in meals if n.time >= "15:00"]
     if len(lunch) != 1:
-        issues.append(f"午餐节点 {len(lunch)} 个（应为 1 个）")
+        # 长途转场日**允许没有午餐**：首景抵达晚于 15:00 时 `materialize_day` 不再单列午餐
+        # （那顿并进晚餐）—— 实测南疆 Day6 库车→喀什 460min，抵达 16:40（踩过）。
+        # 口径与 `scripts/check_planner.py` 保持一致，否则这里会天天打假告警。
+        first_att = next((n for n in dp.nodes if n.type == "attraction"), None)
+        transit_day_without_lunch = (
+            len(lunch) == 0 and first_att is not None and first_att.time > "15:00"
+        )
+        if not transit_day_without_lunch:
+            issues.append(f"午餐节点 {len(lunch)} 个（应为 1 个）")
     if len(dinner) != 1:
         issues.append(f"晚餐节点 {len(dinner)} 个（应为 1 个）")
     start_s, end_s = planner.day_window(req, dp.day, req.days)

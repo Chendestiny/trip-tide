@@ -3,7 +3,7 @@
 // 小程序端有一份独立实现：miniprogram/utils/store.js（wx.storage + 手写订阅）。
 // 两端刻意不共享代码 —— 业务规则（上限、去重、投影）是重复的，改动要两边一起改。
 //
-// 未来并入 my-website 后可把 history 换成后端 /api/trip/plans，本文件对外接口保持不变。
+// 接入账号体系后可把 history 换成后端 /api/trip/plans，本文件对外接口保持不变。
 
 import { reactive, computed } from 'vue'
 

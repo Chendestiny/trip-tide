@@ -97,7 +97,7 @@ npm run seed       # 等价于 backend 里的初始化
 
 ## 配置项
 
-全部在 `backend/app/core/config.py`，值写在 `backend/.env`。变量名与 my-website 对齐，未来并库可直接复用。
+全部在 `backend/app/core/config.py`，值写在 `backend/.env`。变量名用通用命名，与其它项目并库时可直接复用。
 
 | 变量 | 不填/留空的后果 |
 |---|---|
@@ -126,7 +126,7 @@ npm run seed       # 等价于 backend 里的初始化
 | 只灌新目的地 | `... -m app.trip.seed --only-empty --per 8` —— **只处理库里还没有景点的目的地**，不会碰老城 |
 | 看库里现状 | `venv/Scripts/python -m app.trip.seed --list` |
 | 后端规则引擎回归 | `cd backend && venv/Scripts/python ../scripts/check_planner.py` |
-| **前端引擎单元测试** | `cd frontend && npm test` —— **39 用例**（node --test，零依赖），测 `src/engine/` 排程引擎镜像；region 预估回归单独跑 `node ../local/check-preview-region.mjs`。改了 `planner.py` 或 `engine/*.js` **两边都要跑**，详见 [`OFFLINE.md`](OFFLINE.md) |
+| **前端单元测试** | `cd frontend && npm test` —— **84 用例**（node --test，零依赖），测 `src/engine/` 排程引擎镜像 + `src/trip-api.js` 接口层；region 预估回归单独跑 `node ../local/check-preview-region.mjs`。改了 `planner.py` 或 `engine/*.js` **两边都要跑**，详见 [`OFFLINE.md`](OFFLINE.md) |
 | 跨目的地边界检查 | `cd backend && venv/Scripts/python ../scripts/check_boundaries.py`（`-v` 看完整清单）—— **加了目的地之后必跑** |
 | 首页排序体检 | `cd backend && venv/Scripts/python ../scripts/check_rank.py`（`--drill` 补口径对照）—— **只读**，查「首页为什么是这个顺序」+ 排序分是否过期 |
 | 重算首页排序分 | `cd backend && venv/Scripts/python ../scripts/rank_cities.py`（`--dry-run` 先看）—— **改过景点热度后必跑**；seed 会自动跑 |
@@ -223,7 +223,7 @@ python scripts/smoke_ui.py --skip-plan  # 跳过耗时约 20s 的规划环节
 **测的是 `src/engine/`（planner.py 的 JS 镜像）**，纯函数、零依赖、不需要起服务：
 
 ```bash
-cd frontend && npm test                 # 39 用例（basics / planner / preview 三份）
+cd frontend && npm test                 # 84 用例（basics / planner / preview / invariants / api-boot-retry）
 node ../local/check-preview-region.mjs  # region 预估回归（河西走廊+莫高窟 / 云南）
 ```
 

@@ -15,7 +15,7 @@
 // 而直接打开/硬刷新同一个 URL 却完全正常（因为不经过过渡）。
 // 排查手段见 scripts/smoke_ui.py。
 //
-// 并入 my-website 时本文件不需要改动 —— 只要在它的 main.js 里注册 /trip 路由，
+// 嵌进宿主站点时本文件不需要改动 —— 只要在它的 main.js 里注册 /trip 路由，
 // 并把 PhoneShell / SiteHeader 换成站点外壳即可。
 import SiteHeader from './components/trip/SiteHeader.vue'
 </script>

@@ -44,10 +44,12 @@ frontend/
     ├── trip-store.js       localStorage：历史方案（上限 30 条）
     ├── trip-theme.js       按天配色 / 节点图标 / 节奏标签
     ├── use-media.js        视口断点（matchMedia）
-    ├── tests/              引擎单元测试（node --test 零依赖，`npm test`，39 用例）
+    ├── tests/              前端单元测试（node --test 零依赖，`npm test`，84 用例）
     │   ├── engine-basics.test.js    pyfmt / 地理交通 / 判定规则
     │   ├── engine-planner.test.js   聚类 / 裁剪 / 物化不变量 / plan_fallback
-    │   └── engine-preview.test.js   region 回归（莫高窟）+ 预估 + 微调冒烟
+    │   ├── engine-preview.test.js   region 回归（莫高窟）+ 预估 + 微调冒烟
+    │   ├── engine-invariants.test.js  引擎补漏 + 跨目的地真数据不变量
+    │   └── api-boot-retry.test.js   接口层冷启动重试（测 trip-api.js，不在引擎里）
     ├── components/trip/
     │   ├── SiteHeader.vue  顶部导航（仅宽屏可见）
     │   ├── PhoneShell.vue  页面外壳：标题行 + 滚动主体 + 3 个 slot

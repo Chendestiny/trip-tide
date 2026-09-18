@@ -25,11 +25,11 @@ its pages map one-to-one — see [`docs/MINIPROGRAM.md`](docs/MINIPROGRAM.md).
 
 ## Interface
 
-| Wide · Home: separate tabs for cities / regions | Wide · Attraction pool: settings panel on the left + live tightness estimate |
+| Wide · Home: separate tabs for cities / regions | Wide · Attraction pool: settings panel on the right + live tightness estimate |
 |---|---|
 | ![Home](docs/screenshots/wide-home.png) | ![Attraction pool](docs/screenshots/wide-pick.png) |
 
-| Wide · Itinerary result: timeline + map + explainer cards | Mobile · Itinerary result (same DOM, switched by media query) |
+| Wide · Itinerary result: per-day timeline + plan notes on the right | Mobile · Itinerary result (same DOM, switched by media query) |
 |---|---|
 | ![Result page](docs/screenshots/wide-plan.png) | ![Mobile](docs/screenshots/mobile-plan.png) |
 
@@ -228,7 +228,7 @@ whether the settings panel is a persistent sidebar or a collapsible bar, and whe
 | [`docs/API.md`](docs/API.md) | Contracts for the 9 HTTP endpoints, error codes, derivation of the tightness thresholds |
 | [`docs/PLAN_SCHEMA.md`](docs/PLAN_SCHEMA.md) | Every field of the timeline data structure `PlanResult` |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Environment setup, common commands, tests, troubleshooting table, to-do |
-| [`docs/testing-prompt.md`](docs/testing-prompt.md) | A self-contained prompt for handing unit-test writing to another model (Python baseline: `backend/tests/test_planner.py`, 122 cases; JS side: `frontend/tests/`, 39 cases) |
+| [`docs/testing-prompt.md`](docs/testing-prompt.md) | A self-contained prompt for handing unit-test writing to another model (Python baseline: `backend/tests/test_planner.py`, 122 cases; JS side: `frontend/tests/`, 84 cases) |
 | [`AGENTS.md`](AGENTS.md) | The operating manual and 25 iron rules for AI agents |
 
 > The `docs/` tree is written in Chinese only; [`docs/README.md`](docs/README.md) is the index.

@@ -25,11 +25,11 @@ V1 交付形态是 **响应式网页版**（Vue 3 + Vite，桌面优先，宽度
 
 ## 界面
 
-| 宽屏 · 首页：城市 / 区域 两个 tab | 宽屏 · 景点池：左设置面板 + 实时紧凑度预估 |
+| 宽屏 · 首页：城市 / 区域 两个 tab | 宽屏 · 景点池：右侧设置面板 + 实时紧凑度预估 |
 |---|---|
 | ![首页](docs/screenshots/wide-home.png) | ![景点池](docs/screenshots/wide-pick.png) |
 
-| 宽屏 · 行程结果：时间轴 + 地图 + 说明卡 | 手机 · 行程结果（同一 DOM，媒体查询切换） |
+| 宽屏 · 行程结果：按天时间轴 + 右侧方案说明 | 手机 · 行程结果（同一 DOM，媒体查询切换） |
 |---|---|
 | ![结果页](docs/screenshots/wide-plan.png) | ![手机](docs/screenshots/mobile-plan.png) |
 
@@ -221,5 +221,5 @@ python scripts/smoke_ui.py --skip-plan
 | [`docs/API.md`](docs/API.md) | 9 个 HTTP 接口的契约、错误码、紧凑度阈值推导 |
 | [`docs/PLAN_SCHEMA.md`](docs/PLAN_SCHEMA.md) | 时间轴数据结构 `PlanResult` 全字段说明 |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | 环境搭建、常用命令、测试、排查表、待办 |
-| [`docs/testing-prompt.md`](docs/testing-prompt.md) | 交给其他模型写单元测试用的提示词（自包含；Python 侧基线 `backend/tests/test_planner.py` 122 用例，JS 侧 `frontend/tests/` 39 用例） |
+| [`docs/testing-prompt.md`](docs/testing-prompt.md) | 交给其他模型写单元测试用的提示词（自包含；Python 侧基线 `backend/tests/test_planner.py` 122 用例，JS 侧 `frontend/tests/` 84 用例） |
 | [`AGENTS.md`](AGENTS.md) | 给 AI agent 的操作手册与 25 条铁律 |

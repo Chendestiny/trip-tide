@@ -2,8 +2,8 @@
 
 配置来源优先级：环境变量 > backend/.env > 本文件默认值。
 
-环境变量命名同时兼容 my-website 的既有写法（DATABASE_URL / DEEPSEEK_API_KEY），
-这样 AI 旅行搭子未来并入 my-website 时 .env 可以直接复用，不用改一行配置。
+环境变量命名采用通用写法（DATABASE_URL / DEEPSEEK_API_KEY），并与 DB_URL / MODEL_API_KEY
+互为别名，并入其它项目时 .env 可以直接复用，不用改一行配置。
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # ---------- 数据库 ----------
-    # DATABASE_URL 为 my-website 既有名，DB_URL 为本项目原名，两者都认
+    # DATABASE_URL 为通用名，DB_URL 为本项目原名，两者都认
     db_url: str = Field(
         "",
         validation_alias=AliasChoices("DATABASE_URL", "DB_URL"),
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     db_echo: bool = False
 
     # ---------- 模型服务 ----------
-    # DEEPSEEK_API_KEY 为 my-website 既有名，MODEL_API_KEY 为通用名，两者都认
+    # DEEPSEEK_API_KEY 为厂商显名，MODEL_API_KEY 为通用名，两者都认
     model_api_key: str = Field(
         "",
         validation_alias=AliasChoices("MODEL_API_KEY", "DEEPSEEK_API_KEY"),

@@ -39,10 +39,12 @@ frontend/src/
 │   ├── planner.js              ← 裁剪 / 聚类分天 / 逐天裁剪 / 住宿 / 时间轴物化
 │   ├── preview.js              ← 紧凑度预估 + 倾向微调
 │   └── offline-data.json       ← 构建期生成（勿手改）
-├── tests/                      ← **引擎单元测试**（node --test，零依赖；39 用例）
+├── tests/                      ← **前端单元测试**（node --test，零依赖；84 用例）
 │   ├── engine-basics.test.js   pyfmt / 地理交通 / 判定规则
 │   ├── engine-planner.test.js  聚类 / 裁剪 / 物化不变量 / plan_fallback
-│   └── engine-preview.test.js  region 回归（莫高窟）+ 预估 + 微调冒烟
+│   ├── engine-preview.test.js  region 回归（莫高窟）+ 预估 + 微调冒烟
+│   ├── engine-invariants.test.js  引擎补漏 + 跨目的地真数据不变量
+│   └── api-boot-retry.test.js  接口层冷启动重试（测 trip-api.js，不在引擎里）
 ├── trip-api.js                 ← 联机接口实现
 └── trip-api-local.js           ← 离线接口实现（与上面同名导出，可整块替换）
 
@@ -69,7 +71,7 @@ local/（gitignore，只在本机用 —— 这些是**回归工具**，不是�
 cd backend && venv/Scripts/python ../scripts/build_offline_data.py
 
 # ② 改过 planner.py（或 engine/*.js）→ 引擎单测 + 一致性对照，必须全绿
-cd frontend && npm test                                     # 39 个引擎单元测试
+cd frontend && npm test                                     # 84 个单元测试（引擎镜像 + 接口层）
 cd ../backend && venv/Scripts/python ../local/offline-dump-py.py
 node ../local/offline-dump-js.mjs                # 用 managed node 跑即可
 venv/Scripts/python ../local/offline-diff.py     # 期望输出 PASS
