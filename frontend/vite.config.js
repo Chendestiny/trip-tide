@@ -30,6 +30,23 @@ export default defineConfig(({ mode }) => {
       },
     },
 
+    /**
+     * 只让依赖预打包去扫 `index.html`。
+     *
+     * 默认值是**爬取根目录下所有 `**\/*.html`**，而 `mock/mock.html` 是「构建期模板」不是页面：
+     * 它内联的脚本里有两处占位符（`const DATA = /*__DATA__*\/;` 与 `/*__ENGINE__*\/`），
+     * 由 `scripts/build_mock_html.py` 在构建时做字符串替换后才成为合法 JS。
+     * 原文里的 `/*__DATA__*\/` 是注释、等于 `const DATA = ;` —— esbuild 解析直接报
+     * `Unexpected ";"`，**整个依赖扫描失败**。
+     *
+     * 后果不是「日志里多一行红字」：扫描失败意味着这次启动没有预打包结果，
+     * 首次打开页面时才边跑边优化，Vite 随即触发一次重载 —— 表现就是
+     * **首次加载报错、刷新一次就正常**（且每次重启 dev server 必然复现）。
+     */
+    optimizeDeps: {
+      entries: ['index.html'],
+    },
+
     // 离线产物会被内联成一个 HTML 文件并可能挂在子路径下（workbuddy.link/p/{id}），
     // 用相对路径最稳；产物单独出到 dist-offline/，别和联机版混在一起。
     base: offline ? './' : '/',

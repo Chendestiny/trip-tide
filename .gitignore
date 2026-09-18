@@ -16,6 +16,8 @@ backend/data/*.db-journal
 # Node
 node_modules/
 dist/
+# 离线单文件版的构建中间产物（`npm run build:offline` 产出，由 scripts/build_single_html.py 消费）
+dist-offline/
 *.local
 
 # IDE / 系统文件
