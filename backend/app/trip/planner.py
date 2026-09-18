@@ -1297,23 +1297,6 @@ def materialize_day(
         travel = go.minutes
         arrive = cur_time + travel
 
-        # 午饭要落在 11:20-14:00 之间。若这个景点会把午饭挤到 14:00 之后，就「到了先吃」；
-        # 但等待超过 75 分钟就不值得等（比如 09:00 就到华山脚下），那种情况改为下来后再吃。
-        # ⚠️ 例外：「下来后再吃」如果会拖到 15:00 之后，宁可等 —— 实测西疆 Day6 出现过
-        # 10:00 到达、拒绝等 80 分钟、结果午餐 16:40（回归红线 11:00~16:00，踩过）。
-        if not lunch_done:
-            wait = max(0, parse_hhmm(LUNCH_FROM) - arrive)
-            after = arrive + stretch(item)
-            if after > parse_hhmm("14:00") and (
-                wait <= LUNCH_MAX_WAIT or after > parse_hhmm("15:00")
-            ):
-                # 不传 gap：让它按「lunch_at - cur_time」反推，
-                # 这样「路程 80 分 + 等到 11:20 的 60 分」都算进去，时间轴依然自洽
-                add_meal("lunch", max(arrive, parse_hhmm(LUNCH_FROM)), item.district)
-                lunch_done = True
-                travel = 5
-                arrive = cur_time + travel
-
         moved = moved_from.get(item.id)
         stay = stretch(item)
         lunch_at = parse_hhmm(LUNCH_FROM)
@@ -1323,12 +1306,37 @@ def materialize_day(
         # 否则午餐会被拖到 15:00 之后，时间轴上多出一段莫名其妙的长游览。
         morning = lunch_at - arrive
         afternoon = stay - morning
-        if (
+        can_split = (
             not lunch_done
             and arrive < lunch_at < arrive + stay
             and morning >= MIN_SPLIT_MINUTES
             and afternoon >= MIN_SPLIT_MINUTES
-        ):
+        )
+
+        # 「到了先吃」只在**不能跨午饭拆分**时才考虑 —— 拆分能保住完整游览，
+        # 先吃会把游玩切碎（实测西疆 Day6：10:00 到达 + 5h 游览，
+        # 旧顺序先触发「到了先吃」、拆分被跳过；先吃又拒绝等 80 分钟时午餐落到 16:40）。
+        if not lunch_done and not can_split:
+            wait = max(0, lunch_at - arrive)
+            after = arrive + stay
+            if after > parse_hhmm("14:00") and (
+                wait <= LUNCH_MAX_WAIT or after > parse_hhmm("15:00")
+            ):
+                lunch_now = max(arrive, lunch_at)
+                if lunch_now >= parse_hhmm("15:00"):
+                    # 长途转场日：抵达已过午段（实测南疆 Day6 库车→喀什 460min），
+                    # 再插「午餐」就是 16:40 吃午饭 —— 不单列，那顿并进晚餐。
+                    # 回归口径：午餐可以为 0，但首景必须晚于 15:00 到达（见 check_planner）。
+                    lunch_done = True
+                else:
+                    # 不传 gap：让它按「lunch_now - cur_time」反推，
+                    # 这样「路程 + 等到饭点的分钟」都算进去，时间轴依然自洽
+                    add_meal("lunch", lunch_now, item.district)
+                    lunch_done = True
+                    travel = 5
+                    arrive = cur_time + travel
+
+        if can_split:
             back_to_spot = 5      # 从餐厅走回景区只需要步行
             push_attr(arrive, item, morning, travel, go.label, moved)
             cur_lat, cur_lng = item.lat, item.lng

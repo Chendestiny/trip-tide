@@ -39,6 +39,10 @@ frontend/src/
 │   ├── planner.js              ← 裁剪 / 聚类分天 / 逐天裁剪 / 住宿 / 时间轴物化
 │   ├── preview.js              ← 紧凑度预估 + 倾向微调
 │   └── offline-data.json       ← 构建期生成（勿手改）
+├── tests/                      ← **引擎单元测试**（node --test，零依赖；39 用例）
+│   ├── engine-basics.test.js   pyfmt / 地理交通 / 判定规则
+│   ├── engine-planner.test.js  聚类 / 裁剪 / 物化不变量 / plan_fallback
+│   └── engine-preview.test.js  region 回归（莫高窟）+ 预估 + 微调冒烟
 ├── trip-api.js                 ← 联机接口实现
 └── trip-api-local.js           ← 离线接口实现（与上面同名导出，可整块替换）
 
@@ -47,11 +51,13 @@ scripts/
 ├── build_single_html.py        ← dist-offline/ → 单个 HTML（正式版）
 └── build_mock_html.py          ← engine + 数据 → mock 单个 HTML（快速验证件，无需 npm）
 
-local/（gitignore，只在本机用 —— 这三个是**回归工具**，不是临时脚本，别删）
+local/（gitignore，只在本机用 —— 这些是**回归工具**，不是临时脚本，别删）
 ├── offline-cases.json          ← 一致性对照的用例表
 ├── offline-dump-py.py          ← 用真后端引擎跑用例
 ├── offline-dump-js.mjs         ← 用浏览器引擎跑同样的用例
-└── offline-diff.py             ← 逐节点比对（12 用例 / 206 节点）；期望输出 PASS
+├── offline-diff.py             ← 逐节点比对（12 用例 / 195 节点）；期望输出 PASS
+├── check-preview-region.mjs    ← region 预估回归（莫高窟 / 云南 场景）
+└── check-region-flow.py        ← mock 单文件端到端（无头 Edge，file://）
 ```
 
 ---
@@ -62,10 +68,12 @@ local/（gitignore，只在本机用 —— 这三个是**回归工具**，不�
 # ① 改过种子数据 / 首页排序口径 → 重新生成内联数据
 cd backend && venv/Scripts/python ../scripts/build_offline_data.py
 
-# ② 改过 planner.py（或 engine/*.js）→ 跑一致性对照，必须全绿
-cd backend && venv/Scripts/python ../local/offline-dump-py.py
+# ② 改过 planner.py（或 engine/*.js）→ 引擎单测 + 一致性对照，必须全绿
+cd frontend && npm test                                     # 39 个引擎单元测试
+cd ../backend && venv/Scripts/python ../local/offline-dump-py.py
 node ../local/offline-dump-js.mjs                # 用 managed node 跑即可
 venv/Scripts/python ../local/offline-diff.py     # 期望输出 PASS
+node ../local/check-preview-region.mjs           # region 预估回归（莫高窟）
 
 # ③ 出单文件 HTML
 cd frontend && npm run build:offline

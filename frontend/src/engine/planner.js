@@ -747,21 +747,6 @@ export function materializeDay(city, dayIndex, items, req, opts = {}) {
     let travel = go.minutes
     let arrive = curTime + travel
 
-    // 午饭要落在 11:20-14:00 之间。若这个景点会把午饭挤到 14:00 之后，就「到了先吃」；
-    // 但等待超过 75 分钟就不值得等，那种情况改为下来后再吃。
-    // ⚠️ 例外：「下来后再吃」如果会拖到 15:00 之后，宁可等 —— 实测西疆 Day6 出现过
-    // 10:00 到达、拒绝等 80 分钟、结果午餐 16:40（回归红线 11:00~16:00，踩过）。
-    if (!lunchDone) {
-      const wait = Math.max(0, parseHHMM(LUNCH_FROM) - arrive)
-      const after = arrive + stretch(item)
-      if (after > parseHHMM('14:00') && (wait <= LUNCH_MAX_WAIT || after > parseHHMM('15:00'))) {
-        addMeal('lunch', Math.max(arrive, parseHHMM(LUNCH_FROM)), item.district)
-        lunchDone = true
-        travel = 5
-        arrive = curTime + travel
-      }
-    }
-
     const moved = movedFrom[item.id]
     const stay = stretch(item)
     const lunchAt = parseHHMM(LUNCH_FROM)
@@ -770,7 +755,36 @@ export function materializeDay(city, dayIndex, items, req, opts = {}) {
     // （上午段 → 午餐 → 下午段），而不是「玩完再吃」。
     const morning = lunchAt - arrive
     const afternoon = stay - morning
-    if (!lunchDone && arrive < lunchAt && lunchAt < arrive + stay && morning >= MIN_SPLIT_MINUTES && afternoon >= MIN_SPLIT_MINUTES) {
+    const canSplit =
+      !lunchDone &&
+      arrive < lunchAt &&
+      lunchAt < arrive + stay &&
+      morning >= MIN_SPLIT_MINUTES &&
+      afternoon >= MIN_SPLIT_MINUTES
+
+    // 「到了先吃」只在**不能跨午饭拆分**时才考虑 —— 拆分能保住完整游览，
+    // 先吃会把游玩切碎（实测西疆 Day6：10:00 到达 + 5h 游览，
+    // 旧顺序先触发「到了先吃」、拆分被跳过；先吃又拒绝等 80 分钟时午餐落到 16:40）。
+    if (!lunchDone && !canSplit) {
+      const wait = Math.max(0, lunchAt - arrive)
+      const after = arrive + stay
+      if (after > parseHHMM('14:00') && (wait <= LUNCH_MAX_WAIT || after > parseHHMM('15:00'))) {
+        const lunchNow = Math.max(arrive, lunchAt)
+        if (lunchNow >= parseHHMM('15:00')) {
+          // 长途转场日：抵达已过午段（实测南疆 Day6 库车→喀什 460min），
+          // 再插「午餐」就是 16:40 吃午饭 —— 不单列，那顿并进晚餐。
+          // 回归口径：午餐可以为 0，但首景必须晚于 15:00 到达（见 check_planner）。
+          lunchDone = true
+        } else {
+          addMeal('lunch', lunchNow, item.district)
+          lunchDone = true
+          travel = 5
+          arrive = curTime + travel
+        }
+      }
+    }
+
+    if (canSplit) {
       const backToSpot = 5 // 从餐厅走回景区只需要步行
       pushAttr(arrive, item, morning, travel, go.label, moved)
       curLat = item.lat

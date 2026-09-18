@@ -111,7 +111,13 @@ def check(
         dinner = [n for n in meals if "晚餐" in n.name]
 
         if len(lunch) != 1:
-            problems.append(f"Day{dp.day} 午餐数量={len(lunch)}")
+            # 长途转场日允许**没有午餐**：首景抵达晚于 15:00 时，materialize_day 不再单列
+            # 午餐（那顿并进晚餐）—— 实测南疆 Day6 库车→喀什 460min，抵达 16:40（踩过）。
+            first_att = next((n for n in dp.nodes if n.type == "attraction"), None)
+            if len(lunch) == 0 and first_att is not None and first_att.time > "15:00":
+                pass
+            else:
+                problems.append(f"Day{dp.day} 午餐数量={len(lunch)}")
         elif not ("11:00" <= lunch[0].time <= "16:00"):
             problems.append(f"Day{dp.day} 午餐时间离谱 {lunch[0].time}")
         if len(dinner) != 1:
